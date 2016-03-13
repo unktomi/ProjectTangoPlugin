@@ -9,7 +9,8 @@
 *.pch
 
 # Compiled Dynamic libraries
-*.so
+#*.so #Note that we have an exception to the usual UnrealEngine ignore rules- we do need to use .so files here! 
+# While it is not included directly in the engine, we do need the file present for a successful build.
 *.dylib
 *.dll
 
