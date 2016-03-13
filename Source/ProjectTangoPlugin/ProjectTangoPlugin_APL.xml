@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+Copyright 2016 Opaque Media Group
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+<root xmlns:android="http://schemas.android.com/apk/res/android">
+	<trace enable="true"/>
+
+	<!-- ProjectTangoPlugin Plugin Android Build Initialisation, specify any extra needed variables, 
+		such as platform detection, here. -->
+	<init>
+		<log text="ProjectTangoPlugin Plugin Build Initialisation"/>
+		<!-- Attempt to read the DefaultEngine.ini file to determine if Tango Permissions are required. -->
+		<setBoolFromProperty result="bTangoAreaLearningEnabled" ini="$S(PluginDir)/../../../../Config/DefaultEngine" section="/Script/ProjectTangoPlugin.TangoRuntimeSettings" property="bTangoAreaLearningEnabled" default="true" />
+	</init>
+
+	<!-- Project Tango updates applied to AndroidManifest.xml -->
+	<androidManifestUpdates>
+		<log text="ProjectTangoPlugin Plugin Android Manifest Additions"/>
+		
+		<setElement result="bTangoAreaLearningEnabledElement" value="meta-data" />
+		<addAttribute tag="$bTangoAreaLearningEnabledElement" name="android:name" value="com.projecttango.bTangoAreaLearningEnabled" />
+		<addAttribute tag="$bTangoAreaLearningEnabledElement" name="android:value" value="$B(bTangoAreaLearningEnabled)"/>
+
+		<addElement tag="application" name="bTangoAreaLearningEnabledElement" />
+
+    <setElement result="bRequiresProjectTangoLibraryElement" value="uses-library"/>
+    <addAttribute tag="$bRequiresProjectTangoLibraryElement" name="android:name" value="com.projecttango.libtango_device"/>
+    <addAttribute tag="$bRequiresProjectTangoLibraryElement" name="android:required" value="true"/>
+    
+    <addElement tag="application" name="bRequiresProjectTangoLibraryElement" />
+    
+    <!-- Required for GetCameraIntrinsics as well as the TangoImage component-->
+    <addPermission android:name="android.permission.CAMERA"/>
+
+    <!-- Required for the ability to import and export ADFs.-->
+    <addPermission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+    <addPermission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+
+    <!--<addElements tag="application">
+			<meta-data android:name="com.projecttango.bTangoAreaLearningEnabled" android:value="$B(bTangoAreaLearningEnabled)"/>
+		</addElements>-->
+
+	</androidManifestUpdates>
+
+	<!-- Copy the project's .java files, in this case the ProjectTangoInterface class file.
+        Note: We no longer need to copy any .jar files across- we now only use the .so file already present on the Tango device. -->
+	<resourceCopies>
+    <log text="ProjectTangoPlugin Plugin Android Source Code and Library Resource Copies"/>
+    <copyDir src="$S(PluginDir)/../Java/com" dst="$S(BuildDir)/src/com" />
+	</resourceCopies> 
+  
+	<!-- Import the Project Tango Interface Class into the GameActivity. -->
+  <!-- Note that the java modules referenced here will have to be copied across using the resourceCopies tag, or a 'symbol not found' error will occur.-->
+	<gameActivityImportAdditions>
+		<insert>
+			
+			import com.projecttango.plugin.ProjectTangoInterface;
+			
+		</insert>
+	</gameActivityImportAdditions>
+
+	<!-- Add an Instance of the Tango Interface class to GameActivity. -->
+	<gameActivityClassAdditions>
+		<insert>
+
+      //Project Tango Interface implementation
+
+      private ProjectTangoInterface tangoInterface;
+
+      //Thunking functions
+      // Arbitrary function to test the Android Thunking layer
+      public int AndroidThunkJava_GetArbitraryInt()
+      {
+        return 42;
+      }
+
+      public void AndroidThunkJava_RequestImportPermission(String Filename)
+      {
+        if(tangoInterface != null)
+        {
+          tangoInterface.requestImportPermissions(this, Filename);
+        }
+        return;
+      }
+
+      public void AndroidThunkJava_RequestExportPermission(String UUID, String Filename)
+      {
+        if(tangoInterface != null)
+        {
+         tangoInterface.requestExportPermissions(this, UUID, Filename);
+        }
+      return;
+      }
+    </insert>
+	</gameActivityClassAdditions>
+
+	<!-- Determine if the Tango Interface instance can be created, and what intents are required to run. -->
+	<gameActivityReadMetadataAdditions>
+		<insert>
+			
+			boolean IsTangoAreaLearningEnabled = false;
+    
+			//Is the Area Learning Intent Enabled.
+
+			if (bundle.containsKey("com.projecttango.bTangoAreaLearningEnabled"))
+			{
+				IsTangoAreaLearningEnabled = bundle.getBoolean("com.projecttango.bTangoAreaLearningEnabled");
+				Log.debug( "Found bTangoAreaLearningEnabled = " + IsTangoAreaLearningEnabled);
+			}
+			
+      //We want an interface even if there are no special permissions requested as Tango motion no longer requires permissions
+      
+				tangoInterface = new ProjectTangoInterface(IsTangoAreaLearningEnabled);
+			
+		</insert>
+	</gameActivityReadMetadataAdditions>
+
+	<!-- When the Activity Resumes, tell the Project Tango Interface to resume. -->
+	<gameActivityOnResumeAdditions>
+		<insert>
+			
+			if (tangoInterface != null)
+			{
+				tangoInterface.resume(this);
+			}
+			
+		</insert>
+	</gameActivityOnResumeAdditions>
+  
+  <!-- When the Activity pauses, tell the Project Tango Interface to pause. -->
+  <gameActivityOnPauseAdditions>
+    <insert>
+
+      if (tangoInterface != null) {
+        tangoInterface.pause();
+      }
+
+    </insert>
+  </gameActivityOnPauseAdditions>
+
+	<!-- Pass any ActivityResults to the Project Tango Interface in case it can handle it -->
+	<gameActivityOnActivityResultAdditions>
+		<insert>
+			
+			if (tangoInterface != null &amp;&amp; tangoInterface.handleActivityResult(requestCode, resultCode, data, this))
+			{
+				Log.debug("Project Tango Interface handled onActivityResult");
+			}
+			
+		</insert>
+	</gameActivityOnActivityResultAdditions>
+	
+	<!-- Tell the Java implementation to load the Tango API library on the device 
+		before we start executing the GameActivity. -->
+	<soLoadLibrary>
+		<log text="ProjectTangoPlugin Plugin Native Library load addition."/>
+		<loadLibrary name="libtango_client_api" failmsg="Tango Client API library failed to load when it is required to run the application." />
+	</soLoadLibrary>
+</root>

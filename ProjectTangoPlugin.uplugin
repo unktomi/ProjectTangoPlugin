@@ -1,0 +1,22 @@
+{
+	"PluginFileVersion" : 3,
+
+	"FriendlyName" : "Project Tango Plugin",
+	"Version" : 0.8,
+	"VersionName" : "0.8.1",
+	"CreatedBy" : "Opaque Media Group",
+	"CreatedByURL" : "www.opaque.media",
+	"Description" : "Project Tango Plugin enables the use of Project Tango devices and sensors with Unreal 4",
+	"Category" : "Google",
+	"EnabledByDefault" : "false",
+	"IsBetaVersion": true,
+	"Modules" :
+	[
+		{
+			"Name" : "ProjectTangoPlugin",
+			"Type" : "Runtime",
+			"WhitelistPlatforms" : [ "Win64", "android", "MAC" ],
+      "LoadingPhase" : "Default"
+		}
+	]
+}
