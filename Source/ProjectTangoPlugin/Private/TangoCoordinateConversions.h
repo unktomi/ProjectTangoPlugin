@@ -10,21 +10,23 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.*/
-#include "TangoDataTypes.h"
 
 #pragma once
-#if PLATFORM_ANDROID
-#include "tango_client_api.h"
-#include <pthread.h>
-#endif
+#include "TangoDataTypes.h"
 
-class TangoDeviceAreaLearning
-{
+class TangoSpaceConversions{
 public:
-	TangoDeviceAreaLearning();
-	~TangoDeviceAreaLearning();
+	struct TangoSpaceConversionPair
+	{
+		FTangoCoordinateFramePair Pair;
+		FMatrix UEtoBaseFrame;
+		FMatrix TargetFrameToUE;
+		FMatrix OffsetFromDevice;
+		bool bNeedToBeQueriedFromDevice;
+		bool bIsStatic;
+	};
 
-	//Tango Area Learning functions
-	bool DeleteAreaDescription(FString UUID);
-	FTangoAreaDescription SaveCurrentArea(FString Filename, bool& bIsSuccessful);
+	static bool GetSpaceConversionPair(TangoSpaceConversionPair& Pair,const FTangoCoordinateFramePair& RefPair);
+	
+	static void ModifyPose(FTangoPoseData& Pose, const TangoSpaceConversionPair& Converter);
 };

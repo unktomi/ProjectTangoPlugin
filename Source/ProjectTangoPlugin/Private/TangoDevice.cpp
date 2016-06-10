@@ -24,7 +24,7 @@ limitations under the License.*/
 
 UTangoDevice* UTangoDevice::Instance;
 
-UTangoDevice::UTangoDevice() : FTickableGameObject(), UObject()
+UTangoDevice::UTangoDevice() : UObject(), FTickableGameObject()
 {
 	UE_LOG(ProjectTangoPlugin, Log, TEXT("UTangoDevice::UTangoDevice: Instantiating TangoDevice"));
 	ConnectionState = DISCONNECTED;
@@ -32,6 +32,9 @@ UTangoDevice::UTangoDevice() : FTickableGameObject(), UObject()
 	motionHelper = nullptr;
 	imageHelper = nullptr;
 	areaHelper = nullptr;
+#if PLATFORM_ANDROID
+    AppContextReference = nullptr;
+#endif
 	UE_LOG(ProjectTangoPlugin, Log, TEXT("UTangoDevice::UTangoDevice: Instantiating TangoDevice FINISHED"));
 }
 
@@ -55,6 +58,56 @@ void UTangoDevice::ProperInitialize()
 	UE_LOG(ProjectTangoPlugin, Log, TEXT("UTangoDevice::ProperInitialize: FINISHED"));
 }
 
+#if PLATFORM_ANDROID
+/*
+ *  This function will populate the AppContextReference object with the Application context using a call to Java code via the JNI.
+ *  @TODO: Investigate whether we need to call this on every connection or whether we can get away with only
+ * triggering it once on app startup (i.e. will the application context switch? Is the bad global reference we
+ * experienced when calling only at TangoDevice startup due to local references from the Unreal JNI pipeline being
+ * converted into globals incorrectly, or because the Application context which is being pointed to has changed?)
+ */
+void UTangoDevice::PopulateAppContext()
+{
+    jobject AppContext = NULL;
+
+    if (JNIEnv* Env = FAndroidApplication::GetJavaEnv())
+    {
+        //We identify the method we need to call, by passing the name of the function.
+        static jmethodID Method = FJavaWrapper::FindMethod(Env, FJavaWrapper::GameActivityClassID, "AndroidThunkJava_GetAppContext", "()Landroid/content/Context;", false);
+        //Once jmethodID has been identified, we supply it as an argument to CallObjectMethod.
+        //Use CallObjectMethod for functions which return a jobject, CallIntMethod for functions which return an int, etc.
+        AppContext = FJavaWrapper::CallObjectMethod(Env, FJavaWrapper::GameActivityThis, Method);
+        
+        if (AppContext == NULL)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("UTangoDevice::PopulateAppContext: Error - app context is still NULL after retrieval call!"));
+            AppContextReference = nullptr;
+        }
+        else
+        {
+            UE_LOG(LogTemp, Warning, TEXT("UTangoDevice::PopulateAppContext: Success - appcontext jobject is not null!!"));
+            //Now we cache the activity for later use to prevent garbage collection
+            AppContextReference = Env->NewGlobalRef(AppContext);
+        }
+    }
+    
+    return;
+}
+
+void UTangoDevice::DePopulateAppContext()
+{
+    if (JNIEnv* Env = FAndroidApplication::GetJavaEnv())
+    {
+        Env->DeleteGlobalRef(AppContextReference);
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("UTangoDevice::PopulateAppContext: Success - appcontext jobject is not null!!"));
+    }
+    
+}
+#endif
+
 void UTangoDevice::DeallocateResources()
 {
 	UE_LOG(ProjectTangoPlugin, Log, TEXT("UTangoDevice::DeallocateResources: Called"));
@@ -63,6 +116,7 @@ void UTangoDevice::DeallocateResources()
 	{
 		TangoConfig_free(config_);
 		config_ = nullptr;
+        DePopulateAppContext();
 	}
 #endif
 	if (getTangoDevicePointCloudPointer() != nullptr)
@@ -88,10 +142,6 @@ UTangoDevice::~UTangoDevice()
 	{
 		DeallocateResources();
 		DestroyEventresources();
-		if (GEngine)
-		{
-			GEngine->ViewExtensions.Remove(ViewExtension);
-		}
 	}
 }
 
@@ -102,11 +152,6 @@ void UTangoDevice::BeginDestroy()
 	Super::BeginDestroy();
 	DeallocateResources();
 	DestroyEventresources();
-	if (GEngine && bFTangoViewExtensionRegistered)
-	{
-		bFTangoViewExtensionRegistered = false;
-		GEngine->ViewExtensions.Remove(ViewExtension);
-	}
 }
 
 bool UTangoDevice::IsTickable() const
@@ -125,13 +170,6 @@ void UTangoDevice::Tick(float DeltaTime)
 		getTangoDevicePointCloudPointer()->TickByDevice();
 	}
 	BroadCastEvents();
-	//Since the GEngine takes a while to initialize we will have to do this here....
-	if (GEngine && !bFTangoViewExtensionRegistered)
-	{
-		//UE_LOG(GoogleTangoPlugin, Log, TEXT("UTangoDevice::UTangoDevice: GEngine valid. Late Update working. %d"),reinterpret_cast<int32>(this));
-		GEngine->ViewExtensions.Add(ViewExtension);
-		bFTangoViewExtensionRegistered = true;
-	}
 }
 
 TStatId UTangoDevice::GetStatId() const
@@ -145,9 +183,16 @@ UTangoDevice& UTangoDevice::Get()
 	{
 		Instance = NewObject<UTangoDevice>(UTangoDevice::StaticClass());
 		Instance->ProperInitialize();
-		//This flag ensures the singleton is never garbage collected.
-		Instance->SetFlags(RF_RootSet);
 		Instance->SetFlags(RF_Transient);
+		//This flag ensures the singleton is never garbage collected.
+		if (Instance->IsSafeForRootSet())
+		{
+			Instance->SetInternalFlags(Instance->GetInternalFlags() | EInternalObjectFlags::RootSet);
+		}
+		else
+		{
+			UE_LOG(ProjectTangoPlugin, Error, TEXT("TangoDevice is not save for RootSet!"));
+		}
 	}
 
 	return *Instance;
@@ -196,54 +241,57 @@ void UTangoDevice::StartTangoService(FTangoConfig & config, FTangoRuntimeConfig&
 	CurrentConfig = config;
 	CurrentRuntimeConfig = runtimeConfig;
 #if PLATFORM_ANDROID
-	ApplyConfig();
 	ConnectTangoService();
 #endif
 }
 
 
-bool UTangoDevice::SetTangoRuntimeConfig(FTangoRuntimeConfig Configuration, bool PreRuntime)
+bool UTangoDevice::SetTangoRuntimeConfig(FTangoRuntimeConfig Configuration, bool bPreRuntime)
 {
+	UE_LOG(ProjectTangoPlugin, Log, TEXT("UTangoDevice::SetTangoRuntimeConfig: Called."));
 #if PLATFORM_ANDROID
 	if (config_ == nullptr)
 	{
 		UE_LOG(ProjectTangoPlugin, Error, TEXT("UTangoDevice::SetTangoRuntimeConfig: Unable to set runtime config Tango config pointer is nullptr."));
 		return false;
 	}
-	if(!PreRuntime && !IsTangoServiceRunning() )
+	if(!bPreRuntime && !IsTangoServiceRunning() )
 	{
 		UE_LOG(ProjectTangoPlugin, Error, TEXT("UTangoDevice::SetTangoRuntimeConfig: Unable to set runtime config since Tango Service is not running."));
 		return false;
 	}
+
 #endif
-	bool success = true;
-#if PLATFOR_ANDROID
-	success = TangoConfig_setInt32(config_, "config_runtime_depth_framerate", Configuration.EnableDepth ? Configuration.RuntimeDepthFramerate : 0) == TANGO_SUCCESS	&& success;
-#endif
-	if (Configuration.EnableDepth && getTangoDevicePointCloudPointer() == nullptr)
+	bool bSuccess = true;
+	if (Configuration.bEnableDepth && !CurrentConfig.bEnableDepthCapabilities)
 	{
-		Configuration.EnableDepth = false;
+		Configuration.bEnableDepth = false;
 		UE_LOG(ProjectTangoPlugin, Warning, TEXT("UTangoDevice::SetTangoRuntimeConfig: Unable to set EnableDepth to Runtimeconfig since Config has no DepthCapabilites enabled"));
 	}
-	if (Configuration.EnableColorCamera && getTangoDeviceImagePointer() == nullptr)
+#if PLATFORM_ANDROID
+	UE_LOG(ProjectTangoPlugin, Log, TEXT("UTangoDevice::SetTangoRuntimeConfig: Rate is: %d "),(Configuration.bEnableDepth ? Configuration.RuntimeDepthFramerate : 0));
+	bSuccess = TangoConfig_setInt32(config_, "config_runtime_depth_framerate", Configuration.bEnableDepth ? Configuration.RuntimeDepthFramerate : 0) == TANGO_SUCCESS && bSuccess;
+	if (!bPreRuntime)
 	{
-		Configuration.EnableColorCamera = false;
+		UE_LOG(ProjectTangoPlugin, Log, TEXT("UTangoDevice::SetTangoRuntimeConfig: TangoService_setRuntimeConfig"));
+		bSuccess = TangoService_setRuntimeConfig(config_) && bSuccess;
+	}
+#endif
+
+
+	if (Configuration.bEnableColorCamera  && !CurrentConfig.bEnableColorCameraCapabilities)
+	{
+		Configuration.bEnableColorCamera = false;
 		UE_LOG(ProjectTangoPlugin, Warning, TEXT("UTangoDevice::SetTangoRuntimeConfig: Unable to set EnableColorCamera to Runtimeconfig since Config has no ColorCameraCapabilites enabled"));
 	}
-	else if (getTangoDeviceImagePointer())
+	else if (CurrentConfig.bEnableColorCameraCapabilities && getTangoDeviceImagePointer())
 	{
 		getTangoDeviceImagePointer()->setRuntimeConfig(Configuration);
 	}
 	CurrentRuntimeConfig = Configuration;
 
-#if PLATFORM_ANDROID
-	if (!PreRuntime)
-	{
-		success = TangoService_setRuntimeConfig(config_) && success;
-	}
-#endif
 
-	return success;
+	return bSuccess;
 }
 
 // Disconnect Tango Service.
@@ -288,7 +336,7 @@ FTangoCameraIntrinsics UTangoDevice::GetCameraIntrinsics(TEnumAsByte<ETangoCamer
 
 bool UTangoDevice::IsLearningModeEnabled()
 {
-	return CurrentConfig.EnableLearningMode && IsTangoServiceRunning();
+	return CurrentConfig.bEnableLearningMode && IsTangoServiceRunning();
 }
 //END - Core Tango functions
 
@@ -313,81 +361,177 @@ bool UTangoDevice::ApplyConfig()
 		}
 	}
 
-	bool success = true;
-	success = TangoConfig_setBool(config_, "config_enable_auto_recovery", CurrentConfig.EnableAutoRecovery) == TANGO_SUCCESS	&& success;
-	success = TangoConfig_setBool(config_, "config_enable_color_camera", CurrentConfig.EnableColorCameraCapabilities) == TANGO_SUCCESS	&& success;
-	success = TangoConfig_setBool(config_, "config_color_mode_auto", CurrentConfig.ColorModeAuto) == TANGO_SUCCESS	&& success;
-	success = TangoConfig_setBool(config_, "config_enable_depth", CurrentConfig.EnableDepthCapabilities) == TANGO_SUCCESS	&& success;
-	success = TangoConfig_setBool(config_, "config_high_rate_pose", CurrentConfig.HighRatePose) == TANGO_SUCCESS	&& success;
-	success = TangoConfig_setBool(config_, "config_enable_learning_mode", CurrentConfig.EnableLearningMode) == TANGO_SUCCESS	&& success;
-	success = TangoConfig_setBool(config_, "config_enable_low_latency_imu_integration", CurrentConfig.LowLatencyIMUIntegration) == TANGO_SUCCESS	&& success;
-	success = TangoConfig_setBool(config_, "config_enable_motion_tracking", CurrentConfig.EnableMotionTracking) == TANGO_SUCCESS	&& success;
-	success = TangoConfig_setBool(config_, "config_smooth_pose", CurrentConfig.SmoothPose) == TANGO_SUCCESS	&& success;
-	success = TangoConfig_setInt32(config_, "config_color_exp", CurrentConfig.ColorExposure) == TANGO_SUCCESS	&& success;
-	success = TangoConfig_setInt32(config_, "config_color_iso", CurrentConfig.ColorISO) == TANGO_SUCCESS	&& success;
-	success = TangoConfig_setString(config_, "config_load_area_description_UUID", TCHAR_TO_ANSI(*CurrentConfig.AreaDescription.UUID)) == TANGO_SUCCESS	&& success;
+	bool bSuccess = true;
+	bSuccess = TangoConfig_setBool(config_, "config_enable_auto_recovery", CurrentConfig.bEnableAutoRecovery) == TANGO_SUCCESS	&& bSuccess;
+	bSuccess = TangoConfig_setBool(config_, "config_enable_color_camera", CurrentConfig.bEnableColorCameraCapabilities) == TANGO_SUCCESS	&& bSuccess;
+	bSuccess = TangoConfig_setBool(config_, "config_color_mode_auto", CurrentConfig.bColorModeAuto) == TANGO_SUCCESS	&& bSuccess;
+	bSuccess = TangoConfig_setBool(config_, "config_enable_depth", CurrentConfig.bEnableDepthCapabilities) == TANGO_SUCCESS	&& bSuccess;
+	bSuccess = TangoConfig_setBool(config_, "config_high_rate_pose", CurrentConfig.bHighRatePose) == TANGO_SUCCESS	&& bSuccess;
+	bSuccess = TangoConfig_setBool(config_, "config_enable_learning_mode", CurrentConfig.bEnableLearningMode) == TANGO_SUCCESS	&& bSuccess;
+	bSuccess = TangoConfig_setBool(config_, "config_enable_low_latency_imu_integration", CurrentConfig.bLowLatencyIMUIntegration) == TANGO_SUCCESS	&& bSuccess;
+	bSuccess = TangoConfig_setBool(config_, "config_enable_motion_tracking", CurrentConfig.bEnableMotionTracking) == TANGO_SUCCESS	&& bSuccess;
+	bSuccess = TangoConfig_setBool(config_, "config_smooth_pose", CurrentConfig.bSmoothPose) == TANGO_SUCCESS	&& bSuccess;
+	bSuccess = TangoConfig_setInt32(config_, "config_color_exp", CurrentConfig.ColorExposure) == TANGO_SUCCESS	&& bSuccess;
+	bSuccess = TangoConfig_setInt32(config_, "config_color_iso", CurrentConfig.ColorISO) == TANGO_SUCCESS	&& bSuccess;
+	bSuccess = TangoConfig_setString(config_, "config_load_area_description_UUID", TCHAR_TO_ANSI(*CurrentConfig.AreaDescription.UUID)) == TANGO_SUCCESS	&& bSuccess;
 	
-	if (!success)
+	if (!bSuccess)
 	{
 		UE_LOG(ProjectTangoPlugin, Warning, TEXT(" UTangoDevice::ApplyConfig: ApplyConfig FAILED because the config parameters could not be set."));
 	}
 
-	success = SetTangoRuntimeConfig(CurrentRuntimeConfig,true) && success;
+	bSuccess = SetTangoRuntimeConfig(CurrentRuntimeConfig,true) && bSuccess;
 
-	return success;
+	return bSuccess;
 }
 
+/*
+ * This funciton sends a request to the Java layer to start the Tango service
+ */
 void UTangoDevice::ConnectTangoService()
 {
-	UE_LOG(ProjectTangoPlugin, Log, TEXT("UTangoDevice::ConnectTangoService: Called"));
+    
+    //@TODO: Call the Java RequestConnectToService function
+    UE_LOG(ProjectTangoPlugin, Log, TEXT("UTangoDevice::ConnectTangoService: starting service binding request call."));
+    //Make the call to Java
+    
+#if PLATFORM_ANDROID
+    jobject AppContext = NULL;
+    
+    if (JNIEnv* Env = FAndroidApplication::GetJavaEnv())
+    {
+        
+        static jmethodID RequestTangoServiceMethod = FJavaWrapper::FindMethod(Env, FJavaWrapper::GameActivityClassID, "AndroidThunkJava_RequestTangoService", "()V", false);
+        
+        FJavaWrapper::CallVoidMethod(Env, FJavaWrapper::GameActivityThis, RequestTangoServiceMethod);
+    }
+    else
+    {
+        UE_LOG(ProjectTangoPlugin, Error, TEXT("UTangoDevice::ConnectTangoService: Could not get Java environment!"));
+    }
+#endif
+    UE_LOG(ProjectTangoPlugin, Log, TEXT("UTangoDevice::ConnectTangoService: Finished sevice binding request call."));
+
+}
+
+/*
+ * This funciton sends a request to the Java layer to start the Tango service
+ */
+void UTangoDevice::UnbindTangoService()
+{
+    
+    //@TODO: Call the Java RequestConnectToService function
+    UE_LOG(ProjectTangoPlugin, Log, TEXT("UTangoDevice::UnbindTangoService: starting service unbinding request call."));
+    //Make the call to Java
+    
+#if PLATFORM_ANDROID
+    jobject AppContext = NULL;
+    
+    if (JNIEnv* Env = FAndroidApplication::GetJavaEnv())
+    {
+        
+        static jmethodID TestJavaRoundTripMethod = FJavaWrapper::FindMethod(Env, FJavaWrapper::GameActivityClassID, "AndroidThunkJava_UnbindTangoService", "()V", false);
+        
+        FJavaWrapper::CallVoidMethod(Env, FJavaWrapper::GameActivityThis, TestJavaRoundTripMethod);
+    }
+    else
+    {
+        UE_LOG(ProjectTangoPlugin, Error, TEXT("UTangoDevice::UnbindTangoService: Could not get Java environment!"));
+    }
+#endif
+    UE_LOG(ProjectTangoPlugin, Log, TEXT("UTangoDevice::UnbindTangoService: Finished sevice unbinding request call."));
+    
+}
+
+
+#if PLATFORM_ANDROID
+extern "C"
+{
+    //JavaThunkCpp: Native function which is called by Java code. Completes connection to the Tango service.
+    JNIEXPORT void JNICALL
+    Java_com_projecttango_plugin_ProjectTangoInterface_OnJavaTangoServiceConnected(JNIEnv* env, jobject, jobject iBinder)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("UTangoDevice::OnJavaServiceConnected: Success- C++ function called from Java!"));
+        //Java service connection finished, complete C API connection
+        UTangoDevice::Get().BindAndCompleteConnectionToService(env, iBinder);
+    }
+}
+#endif
+
+#if PLATFORM_ANDROID
+/*
+ *  This function should be called after the Tango service has been bound at the Java level.
+ */
+void UTangoDevice::BindAndCompleteConnectionToService(JNIEnv* env, jobject iBinder)
+{
+    
+    //Bind to the Tango service
+    if (TangoService_setBinder(env, iBinder) != TANGO_SUCCESS)
+    {
+        UE_LOG(ProjectTangoPlugin, Error, TEXT(" UTangoDevice::BindAndCompleteConnectionToService: could not bind to Tango Service."));
+    }
+    else
+    {
+        UE_LOG(ProjectTangoPlugin, Log, TEXT(" UTangoDevice::BindAndCompleteConnectionToService: successfully bound to Tango Service."));
+    }
+    
+    //Apply the service configuration
+    ApplyConfig();
+    
+	UE_LOG(ProjectTangoPlugin, Log, TEXT("UTangoDevice::BindAndCompleteConnectionToService: Called"));
 	if (config_ == nullptr)
 	{
-		UE_LOG(ProjectTangoPlugin, Error, TEXT(" UTangoDevice::ConnectTangoService: failed because config is NULL."));
+		UE_LOG(ProjectTangoPlugin, Error, TEXT(" UTangoDevice::BindAndCompleteConnectionToService: failed because config is NULL."));
 		return;
 	}
 
-	UE_LOG(ProjectTangoPlugin, Log, TEXT("UTangoDevice::ConnectTangoService: Connecting!"));
-	ConnectionState = TangoService_connect(nullptr, config_) == TANGO_SUCCESS ? CONNECTED : FAILED_TO_CONNECT;
+    //Refresh Java global reference here
+    /*@TODO: This is a little hacky, see if we can get a reference to a state which won't be garbage collected so we don't need to do this.*/
+    PopulateAppContext();
+    
+    //Attempt to connect to the now bound service
+	UE_LOG(ProjectTangoPlugin, Log, TEXT("UTangoDevice::BindAndCompleteConnectionToService: Connecting!"));
+	ConnectionState = TangoService_connect(AppContextReference, config_) == TANGO_SUCCESS ? CONNECTED : FAILED_TO_CONNECT;
 
 	//Creating and deleting of additional class components that register callbacks and do their own thing
-	if (CurrentConfig.EnableDepthCapabilities && getTangoDevicePointCloudPointer() == nullptr)
+	if (CurrentConfig.bEnableDepthCapabilities && getTangoDevicePointCloudPointer() == nullptr)
 	{
 		pointCloudHelper = new TangoDevicePointCloud(config_);
 	}
-	else if (!CurrentConfig.EnableDepthCapabilities && getTangoDevicePointCloudPointer() != nullptr)
+	else if (!CurrentConfig.bEnableDepthCapabilities && getTangoDevicePointCloudPointer() != nullptr)
 	{
 		delete pointCloudHelper;
 		pointCloudHelper = nullptr;
 	}
 
-	if (CurrentConfig.EnableMotionTracking && getTangoDeviceMotionPointer() == nullptr)
+	if (CurrentConfig.bEnableMotionTracking && getTangoDeviceMotionPointer() == nullptr)
 	{
 		motionHelper = NewObject<UTangoDeviceMotion>(UTangoDeviceMotion::StaticClass());
 		motionHelper->ProperInitialize();
 	}
-	else if (!CurrentConfig.EnableMotionTracking && getTangoDeviceMotionPointer() != nullptr)
+	else if (!CurrentConfig.bEnableMotionTracking && getTangoDeviceMotionPointer() != nullptr)
 	{
 		motionHelper->ConditionalBeginDestroy();
 		motionHelper = nullptr;
 	}
 
-	if (CurrentConfig.EnableColorCameraCapabilities && getTangoDeviceImagePointer() == nullptr)
+	if (CurrentConfig.bEnableColorCameraCapabilities && getTangoDeviceImagePointer() == nullptr)
 	{
 		imageHelper = NewObject<UTangoDeviceImage>(UTangoDeviceImage::StaticClass());
 		imageHelper->Init(config_);
 	}
-	else if (!CurrentConfig.EnableColorCameraCapabilities && getTangoDeviceImagePointer() != nullptr)
+	else if (!CurrentConfig.bEnableColorCameraCapabilities && getTangoDeviceImagePointer() != nullptr)
 	{
 		imageHelper->ConditionalBeginDestroy();
 		imageHelper = nullptr;
 	}
 
 	//@todo: Investigate if 'AreaHelper' is overloaded, or if we need to move 'IsLocalized' into the motion component
-	if (CurrentConfig.EnableLearningMode && getTangoDeviceAreaLearningPointer() == nullptr)
+	if (CurrentConfig.bEnableLearningMode && getTangoDeviceAreaLearningPointer() == nullptr)
 	{
 		areaHelper = new TangoDeviceAreaLearning();
 	}
-	else if (!CurrentConfig.EnableLearningMode && getTangoDeviceAreaLearningPointer() != nullptr)
+	else if (!CurrentConfig.bEnableLearningMode && getTangoDeviceAreaLearningPointer() != nullptr)
 	{
 		delete areaHelper;
 		areaHelper = nullptr;
@@ -395,11 +539,11 @@ void UTangoDevice::ConnectTangoService()
 
 	if (getTangoServiceStatus() == FAILED_TO_CONNECT)
 	{
-		UE_LOG(ProjectTangoPlugin, Error, TEXT("UTangoDevice::ConnectTangoService: Unable to connect!"));
+		UE_LOG(ProjectTangoPlugin, Error, TEXT("UTangoDevice::BindAndCompleteConnectionToService: Unable to connect!"));
 	}
 	else
 	{
-		UE_LOG(ProjectTangoPlugin, Log, TEXT("UTangoDevice::ConnectTangoService: Connection succesfull! Now connecting callbacks!"));
+		UE_LOG(ProjectTangoPlugin, Log, TEXT("UTangoDevice::BindAndCompleteConnectionToService: Connection succesfull! Now connecting callbacks!"));
 		if (getTangoDeviceMotionPointer() != nullptr)
 		{
 			getTangoDeviceMotionPointer()->ConnectCallback();
@@ -408,28 +552,42 @@ void UTangoDevice::ConnectTangoService()
 		{
 			getTangoDevicePointCloudPointer()->ConnectCallback();
 		}
-		if (getTangoDeviceImagePointer() != nullptr)
+		if (getTangoDeviceImagePointer() != nullptr && CurrentRuntimeConfig.bEnableColorCamera)
 		{
 			getTangoDeviceImagePointer()->ConnectCallback();
 		}
 	}
 	ConnectEventCallback();//Activate Events
-	UE_LOG(ProjectTangoPlugin, Log, TEXT("UTangoDevice::ConnectTangoService: FINISHED"));
+	UE_LOG(ProjectTangoPlugin, Log, TEXT("UTangoDevice::BindAndCompleteConnectionToService: FINISHED"));
 	BroadCastConnect();
+	//Call a second time to make depth disabling at startup work.
+	if (!CurrentRuntimeConfig.bEnableDepth && CurrentConfig.bEnableDepthCapabilities)
+	{
+		SetTangoRuntimeConfig(CurrentRuntimeConfig);
+	}
 }
+#endif
 
-void UTangoDevice::DisconnectTangoService(bool byAppServicePause)
+void UTangoDevice::DisconnectTangoService(bool bByAppServicePause)
 {
 	UE_LOG(ProjectTangoPlugin, Log, TEXT("UTangoDevice::DisconnectTangoService: Called"));
-
-	//TangoConfig_free(config_);
-	//config_ = NULL;
-	if (getTangoServiceStatus() == CONNECTED)
+	
+    if (getTangoServiceStatus() == CONNECTED)
 	{
-		UE_LOG(ProjectTangoPlugin, Warning, TEXT(" UTangoDevice::DisconnectTangoService: will now disconnect!"));
+		UE_LOG(ProjectTangoPlugin, Log, TEXT(" UTangoDevice::DisconnectTangoService: will now disconnect!"));
 
+        //Free the Tango config object
+        TangoConfig_free(config_);
+        config_ = NULL;
+        
+        //Disconnect from the C service
 		TangoService_disconnect();
-		ConnectionState = byAppServicePause ? DISCONNECTED_BY_APPSERVICEPAUSE : DISCONNECTED;
+        
+        //Unbind from the Java-level service after the TangoService_disconnect call
+        UnbindTangoService();
+        
+        //Mark the current connection state and broadcast the disconnection
+		ConnectionState = bByAppServicePause ? DISCONNECTED_BY_APPSERVICEPAUSE : DISCONNECTED;
 		BroadCastDisconnect();
 	}
 	else
@@ -446,7 +604,7 @@ void UTangoDevice::AppServiceResume()
 	UE_LOG(ProjectTangoPlugin, Log, TEXT("UTangoDevice::AppServiceResume: Called"));
 	if (getTangoServiceStatus() == DISCONNECTED_BY_APPSERVICEPAUSE)//We only reconnect when we disconnected the Tango by AppServicePause first!
 	{
-		UE_LOG(ProjectTangoPlugin, Warning, TEXT(" UTangoDevice::AppServiceResume: Connect service called"));
+		UE_LOG(ProjectTangoPlugin, Log, TEXT(" UTangoDevice::AppServiceResume: Connect service called"));
 		ApplyConfig();
 		ConnectTangoService();
 	}
@@ -456,7 +614,7 @@ void UTangoDevice::AppServiceResume()
 void UTangoDevice::AppServicePause()
 {
 	UE_LOG(ProjectTangoPlugin, Log, TEXT("UTangoDevice::AppServicePause: Called"));
-	if (IsTangoServiceRunning())//We only disconnect when it is already running!
+	if (IsTangoServiceRunning()) //We only disconnect when it is already running!
 	{
 		DeallocateResources();
 		DisconnectTangoService(true);

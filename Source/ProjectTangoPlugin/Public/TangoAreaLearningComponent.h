@@ -50,7 +50,7 @@ public:
 	*	@return The UUID/Filename associated with the newly created ADF.
 	*/
 	UFUNCTION(Category = "Tango|Area Learning", BlueprintCallable, meta = (ToolTip = "Save area description file to this device's Tango Core internal ADF repository.", keyword = "ADF, area, learning, description, save, current"))
-		FTangoAreaDescription SaveCurrentArea(FString Filename, bool& IsSuccessful);
+		FTangoAreaDescription SaveCurrentArea(FString Filename, bool& bIsSuccessful);
 
 	/*
 	*	This function is used to expose the metadata contained within a specified ADF.
@@ -61,7 +61,7 @@ public:
 	* @return The metadata associated with this ADF, including the Filename, Time created (in milliseconds since the Unix Epoch), and the Earth Centered, Earth Fixed translation where the ADF was created.
 	*/
 	UFUNCTION(Category = "Tango|Area Learning", BlueprintCallable, meta = (ToolTip = "Gets metadata information from a given file/UUID.", keyword = "ADF, area, learning, meta, data"))
-		FTangoAreaDescriptionMetaData GetMetaData(FString UUID, bool& IsSuccessful);
+		FTangoAreaDescriptionMetaData GetMetaData(FTangoAreaDescription AreaDescription, bool& bIsSuccessful);
 
 	/*
 	*	Allows users to set the metadata contained within a specified ADF. Includes position in ECEF co-ordinates & Filename of ADF.
@@ -71,7 +71,7 @@ public:
 	*	@param IsSuccessful Returns true if the metadata save was successful.
 	*/
 	UFUNCTION(Category = "Tango|Area Learning", BlueprintCallable, meta = (ToolTip = "Saves metadata information to the given file/UUID.", keyword = "ADF, area, learning, save, meta, data"))
-		void SaveMetaData(FString UUID, FTangoAreaDescriptionMetaData NewMetadata, bool& IsSuccessful);
+		void SaveMetaData(FTangoAreaDescription AreaDescription, FTangoAreaDescriptionMetaData NewMetadata, bool& bIsSuccessful);
 
 	/*
 	*	Imports the given Area Description File stored at the location denoted by the "Filepath" variable.
@@ -80,7 +80,7 @@ public:
 	*	@param IsSuccessful Returns true if the import of the area description file was successful.
 	*/
 	UFUNCTION(Category = "Tango|Area Learning", BlueprintCallable, meta = (ToolTip = "Import an area description file from a given filepath into this device's Tango Core internal ADF repository.", keyword = "ADF, area, learning, import, load"))
-		void ImportADF(FString Filepath, bool& IsSuccessful);
+		void ImportADF(FString Filepath, bool& bIsSuccessful);
 
 	/*
 	*	This function takes an existing, saved ADF within the device's Tango Core ADF repository, and saves the ADF to the file system in the location denoted by the 'Filepath' parameter, e.g. "/sdcard/".
@@ -90,5 +90,5 @@ public:
 	* @param IsSuccessful Returns true if the export of the ADF was successful.
 	*/
 	UFUNCTION(Category = "Tango|Area Learning", BlueprintCallable, meta = (ToolTip = "Export the area description file to the device to the given filepath.", keyword = "ADF, area, learning, meta, data, save, export"))
-		void ExportADF(FString UUID, FString Filepath, bool& IsSuccessful);
+		void ExportADF(FString UUID, FString Filepath, bool& bIsSuccessful);
 };

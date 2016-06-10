@@ -13,13 +13,13 @@ limitations under the License.*/
 
 #include "ProjectTangoPluginPrivatePCH.h"
 #include "TangoDevicePointCloud.h"
+#include "TangoPointCloudComponent.h"
 
 #include "TangoDevice.h"
 
 #include <UnrealTemplate.h>
 
 #if PLATFORM_ANDROID
-//#include "Private/Android/AndroidJNI.h"
 #include "Android/AndroidJNI.h"
 #include "AndroidApplication.h"
 
@@ -28,30 +28,22 @@ limitations under the License.*/
 */
 void TangoDevicePointCloud::OnXYZijAvailable(const TangoXYZij* XYZ_ij)
 {
-
 	if (XYZ_ij->xyz_count <= VertCapacity)
 	{
-		pthread_mutex_lock(&xyzij_mutex);
+		FScopeLock ScopeLock(&XYZIJLock);
 		if (RawDataB != nullptr && XYZ_ij->xyz != nullptr)
 		{
-
-
+			memcpy(IJDataB, XYZ_ij->ij, sizeof(uint32_t) * XYZ_ij->ij_cols * XYZ_ij->ij_rows);
 			memcpy(RawDataB, XYZ_ij->xyz, sizeof(float) * 3 * VertCount);
-
-			/*float(*temp)[3] = RawData;
-			RawData = XYZ_ij->xyz;
-			XYZ_ij->xyz = temp;*/
-
 			NewDataTimeStamp = XYZ_ij->timestamp;
 			VertCount = XYZ_ij->xyz_count;
-
+			ColumnCount = XYZ_ij->ij_cols;
+			RowCount = XYZ_ij->ij_rows;
 		}
-		pthread_mutex_unlock(&xyzij_mutex);
 	}
 }
 #endif
 
-//START - Tango Point Cloud functions
 int32 TangoDevicePointCloud::GetMaxVertexCapacity()
 {
 	return VertCapacity;
@@ -62,19 +54,6 @@ TArray<FVector>& TangoDevicePointCloud::GetPointCloud()
 	return PointCloudValues;
 }
 
-//Returns the latest available XYZijData object.
-FTangoXYZijData TangoDevicePointCloud::GetLatestXYZijData()
-{
-	FTangoXYZijData Result = FTangoXYZijData();
-#if PLATFORM_ANDROID
-	//Result.xyz = GetPointCloud();
-	Result.timestamp = GetPointCloudTimestamp();
-	Result.count = GetPointCloud().Num(); //TODO: This is kinda redundant, remove it?
-#endif
-
-	return Result;
-}
-
 float TangoDevicePointCloud::GetPointCloudTimestamp()
 {
 	return TimeStamp;
@@ -83,24 +62,27 @@ void TangoDevicePointCloud::TickByDevice()
 {
 #if PLATFORM_ANDROID
 
-	bool newDataAvailable = false;
+	bool bIsNewDataAvailable = false;
 	int count = 0;
 
 	if (TimeStamp != NewDataTimeStamp)
 	{
-		pthread_mutex_lock(&xyzij_mutex);
+		FScopeLock ScopeLock(&XYZIJLock);
 		TimeStamp = NewDataTimeStamp;
-		newDataAvailable = true;
+		bIsNewDataAvailable = true;
 		count = VertCount;
-		
 		//Swap buffers
 		float(*temp)[3] = RawData;
 		RawData = RawDataB;
 		RawDataB = temp;
-		pthread_mutex_unlock(&xyzij_mutex);
+
+		int32* ITemp = IJDataA;
+		IJDataA = IJDataB;
+		IJDataB = ITemp;
+
 	}
 
-	if (newDataAvailable)
+	if (bIsNewDataAvailable)
 	{
 		float WorldScale = UTangoDevice::Get().GetMetersToWorldScale();
 		PointCloudValues.SetNum(count, false);
@@ -109,6 +91,18 @@ void TangoDevicePointCloud::TickByDevice()
 			PointCloudValues[i].X = RawData[i][2] * WorldScale;
 			PointCloudValues[i].Y = RawData[i][0] * WorldScale;
 			PointCloudValues[i].Z = -RawData[i][1] * WorldScale;
+		}
+		for (int i = 0; i < UTangoDevice::Get().PointCloudComponents.Num(); ++i)
+		{
+			if (UTangoDevice::Get().PointCloudComponents[i] != nullptr)
+			{
+				UTangoDevice::Get().PointCloudComponents[i]->OnTangoXYZijAvailable.Broadcast(TimeStamp);
+			}
+			else
+			{
+				UTangoDevice::Get().PointCloudComponents.RemoveAt(i);
+				i--;
+			}
 		}
 	}
 #endif
@@ -122,27 +116,30 @@ TangoDevicePointCloud::TangoDevicePointCloud(
 {
 	UE_LOG(ProjectTangoPlugin, Log, TEXT("TangoDevicePointCloud::TangoDevicePointCloud: Creating TangoDevicePointCloud!"));
 	//Setting up Point Cloud Buffers
-
+	TimeStamp = 0;
 #if PLATFORM_ANDROID
 
-	pthread_mutex_init(&xyzij_mutex,NULL);
-
+	NewDataTimeStamp = 0;
 	int max_point_cloud_elements = 0;
-	bool success = TangoConfig_getInt32(config_, "max_point_cloud_elements", &max_point_cloud_elements) == TANGO_SUCCESS;
+	bool bSuccess = TangoConfig_getInt32(config_, "max_point_cloud_elements", &max_point_cloud_elements) == TANGO_SUCCESS;
 	uint32_t MaxPointCloudVertexCount = static_cast<uint32_t>(max_point_cloud_elements);
 
-	if (success)
+	if (bSuccess)
 	{
-		UE_LOG(ProjectTangoPlugin, Log, TEXT("TangoDevicePointCloud::TangoDevicePointCloud: allocations"));
-		pthread_mutex_lock(&xyzij_mutex); 
+		UE_LOG(ProjectTangoPlugin, Log, TEXT("TangoDevicePointCloud::TangoDevicePointCloud: allocations. Max point count: %d"),MaxPointCloudVertexCount);
+		FScopeLock ScopeLock(&XYZIJLock);
 		VertCount = 0;
 		VertCapacity = MaxPointCloudVertexCount;
 		PointCloudValues.Reserve(static_cast<int32_t>(max_point_cloud_elements));
 
 		RawData = new float[MaxPointCloudVertexCount][3];
 		RawDataB = new float[MaxPointCloudVertexCount][3];
-		pthread_mutex_unlock(&xyzij_mutex);
 
+		IJDataA = new int32[MaxPointCloudVertexCount];
+		IJDataB = new int32[MaxPointCloudVertexCount];
+
+		ColumnCount = 0;
+		RowCount = 0;
 	}
 	else
 	{
@@ -164,9 +161,27 @@ void TangoDevicePointCloud::ConnectCallback()
 TangoDevicePointCloud::~TangoDevicePointCloud()
 {
 #if PLATFORM_ANDROID
+	FScopeLock ScopeLock(&XYZIJLock);
 	delete[] RawData;
 	delete[] RawDataB;
-	pthread_mutex_destroy(&xyzij_mutex);
+	delete[] IJDataA;
+	delete[] IJDataB;
+	RawData = nullptr;
+	RawDataB = nullptr;
+	IJDataA = nullptr;
+	IJDataB = nullptr;
 #endif
 }
-//END - Tango Point Cloud functions
+
+int32 * TangoDevicePointCloud::GetIJData(uint32 & _RowCount, uint32 & ColCount)
+{
+#if PLATFORM_ANDROID
+	_RowCount = RowCount;
+	ColCount = ColumnCount;
+	return IJDataA;
+#else
+	_RowCount = 0;
+	ColCount = 0;
+	return nullptr;
+#endif
+}

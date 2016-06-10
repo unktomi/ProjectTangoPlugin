@@ -13,10 +13,12 @@ limitations under the License.*/
 
 #pragma once
 #include "TangoDataTypes.h"
-//#include "TangoFromToCObject.generated.h"
 
 #if PLATFORM_ANDROID
 #include "tango_client_api.h"
+#endif
+
+#if PLATFORM_ANDROID
 
 static FTangoCoordinateFramePair FromCObject(TangoCoordinateFramePair ToConvert)
 {
@@ -30,7 +32,7 @@ static TangoCoordinateFramePair ToCObject(FTangoCoordinateFramePair ToConvert)
 	Result.target = (TangoCoordinateFrameType)(int8)ToConvert.TargetFrame;
 	return Result;
 }
-//@TODO: Update this code to include the proper transformation to Unreal coordinates
+
 static FTangoPoseData FromCPointer(const TangoPoseData* ToConvert)
 {
 	FTangoPoseData Result;
@@ -43,42 +45,11 @@ static FTangoPoseData FromCPointer(const TangoPoseData* ToConvert)
 	return Result;
 }
 
-
-//@NOTE: This requires a WorldToMetersValue to be passed in as it may change during runtime.
-static FTangoPoseData FromCObject(const TangoPoseData ToConvert, float WorldToMetersValue)
-{
-	FQuat TangoToUnrealRotationQuat(ToConvert.orientation[2],
-		-ToConvert.orientation[0],
-		-ToConvert.orientation[1],
-		ToConvert.orientation[3]);
-
-	FQuat ConvertedQuat = (FQuat(0.0, 0.7071, 0.0, 0.7071) * TangoToUnrealRotationQuat);
-
-	FVector ConvertedFVector = WorldToMetersValue * FVector(ToConvert.translation[1], ToConvert.translation[0], ToConvert.translation[2]);
-
-	FTangoPoseData Result;
-	Result.Position = ConvertedFVector;
-	Result.Rotation = FRotator(ConvertedQuat);
-	Result.QuatRotation = ConvertedQuat;
-	Result.Timestamp = ToConvert.timestamp;
-	Result.FrameOfReference = FromCObject(ToConvert.frame);
-	Result.StatusCode = (ETangoPoseStatus::Type)ToConvert.status_code;
-	return Result;
-}
-
-static FTangoXYZijData FromCObject(TangoXYZij)
-{
-	//@TODO: This function
-	return FTangoXYZijData();
-}
-
 static FTangoCameraIntrinsics FromCObject(TangoCameraIntrinsics ToConvert)
 {
 
 	FTangoCameraIntrinsics Result;
 
-	//if(ToConvert != NULL)
-	//{
 	Result.CameraID = static_cast<TEnumAsByte<ETangoCameraType::Type>>((int)ToConvert.camera_id);
 
 	Result.Width = static_cast<int32>(ToConvert.width);
@@ -104,11 +75,6 @@ static FTangoCameraIntrinsics FromCObject(TangoCameraIntrinsics ToConvert)
 	{
 		UE_LOG(ProjectTangoPlugin, Warning, TEXT("FTangoCameraIntrinsics:FromCObject: 'result' array variable on C object was a null pointer "));
 	}
-	//}
-	//else
-	//{
-	//	UE_LOG(ProjectTangoPlugin, Warning, TEXT("FTangoCameraIntrinsics::FromCObject: C object was null."));
-	//}
 	return Result;
 
 }

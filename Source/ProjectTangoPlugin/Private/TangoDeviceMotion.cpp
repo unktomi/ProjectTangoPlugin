@@ -14,17 +14,17 @@ limitations under the License.*/
 #include "ProjectTangoPluginPrivatePCH.h"
 #include "TangoDeviceMotion.h"
 #include "TangoFromToCObject.h"
+#include "TangoCoordinateConversions.h"
 
 #include "TangoDevice.h"
 
 
 #if PLATFORM_ANDROID
-//#include "Private/Android/AndroidJNI.h"
 #include "Android/AndroidJNI.h"
 #include "AndroidApplication.h"
 #endif
 
-UTangoDeviceMotion::UTangoDeviceMotion() : FTickableGameObject(), UObject()
+UTangoDeviceMotion::UTangoDeviceMotion() : UObject(), FTickableGameObject()
 {
 	UE_LOG(ProjectTangoPlugin, Log, TEXT("UTangoDeviceMotion::UTangoDeviceMotion: called"));
 }
@@ -42,15 +42,15 @@ void UTangoDeviceMotion::ConnectCallback()
 {
 	UE_LOG(ProjectTangoPlugin, Log, TEXT("UTangoDeviceMotion::ConnectCallback: called"));
 #if PLATFORM_ANDROID
-	TangoCoordinateFramePair Pairs[CurrentlyRequestedPairs.Num()];// = { { TANGO_COORDINATE_FRAME_START_OF_SERVICE, TANGO_COORDINATE_FRAME_DEVICE } };
+	TangoCoordinateFramePair Pairs[RequestedPairs.Num()];
 	int i = 0;
-	for (auto& Elem : CurrentlyRequestedPairs)
+	for (auto& Elem : RequestedPairs)
 	{
-		Pairs[i].base = static_cast<TangoCoordinateFrameType>(static_cast<int32>(Elem.BaseFrame));
-		Pairs[i].target = static_cast<TangoCoordinateFrameType>(static_cast<int32>(Elem.TargetFrame));
+		Pairs[i].base = static_cast<TangoCoordinateFrameType>(static_cast<int32>(Elem.Key.BaseFrame));
+		Pairs[i].target = static_cast<TangoCoordinateFrameType>(static_cast<int32>(Elem.Key.TargetFrame));
 		i++;
 	}
-	if (TangoService_connectOnPoseAvailable(CurrentlyRequestedPairs.Num(), Pairs, [](void*, const TangoPoseData* Pose) {if (UTangoDevice::Get().getTangoDeviceMotionPointer() != nullptr)UTangoDevice::Get().getTangoDeviceMotionPointer()->OnPoseAvailable(Pose); }) != TANGO_SUCCESS)
+	if (TangoService_connectOnPoseAvailable(RequestedPairs.Num(), Pairs, [](void*, const TangoPoseData* Pose) {if (UTangoDevice::Get().getTangoDeviceMotionPointer() != nullptr)UTangoDevice::Get().getTangoDeviceMotionPointer()->OnPoseAvailable(Pose); }) != TANGO_SUCCESS)
 	{
 		UE_LOG(ProjectTangoPlugin, Error, TEXT("UTangoDeviceMotion::ConnectCallback: Was unsuccessfull"));
 	}
@@ -70,10 +70,30 @@ void UTangoDeviceMotion::BeginDestroy()
 #if PLATFORM_ANDROID
 void UTangoDeviceMotion::OnPoseAvailable(const TangoPoseData* Pose)
 {
-	FTangoPoseData Data = FromCObject(*Pose, UTangoDevice::Get().GetMetersToWorldScale());
-	PoseMutex.Lock();
-	BroadcastTangoPoseData.FindOrAdd(Data.FrameOfReference) = Data; 
-	PoseMutex.Unlock();
+	FTangoPoseData Data = FromCPointer(Pose);
+	if (Data.FrameOfReference.BaseFrame == ETangoCoordinateFrameType::PREVIOUS_DEVICE_POSE && Data.FrameOfReference.TargetFrame == ETangoCoordinateFrameType::DEVICE)
+	{
+		PoseMutex.Lock();
+		if (BroadcastTangoPoseData.Contains(Data.FrameOfReference))//We have to accumulate the previous device pose -> device pose frame!
+		{
+			FTangoPoseData OldData = BroadcastTangoPoseData[Data.FrameOfReference];
+			Data.Position = OldData.QuatRotation * Data.Position + OldData.Position;
+			Data.QuatRotation = OldData.QuatRotation * Data.QuatRotation;
+			Data.Rotation = Data.QuatRotation.Rotator();
+			BroadcastTangoPoseData[Data.FrameOfReference] = Data;
+		}
+		else
+		{
+			BroadcastTangoPoseData.FindOrAdd(Data.FrameOfReference) = Data;
+		}
+		PoseMutex.Unlock();
+	}
+	else
+	{
+		PoseMutex.Lock();
+		BroadcastTangoPoseData.FindOrAdd(Data.FrameOfReference) = Data;
+		PoseMutex.Unlock();
+	}
 }
 #endif
 
@@ -81,26 +101,49 @@ void UTangoDeviceMotion::OnPoseAvailable(const TangoPoseData* Pose)
 
 FTangoPoseData UTangoDeviceMotion::GetPoseAtTime(FTangoCoordinateFramePair FrameOfReference, float Timestamp)
 {
-
+    //Prevent Tango calls before the system is ready, return null data instead
+    if(!(UTangoDevice::Get().IsTangoServiceRunning()))
+    {
+        return FTangoPoseData();
+    }
+    
 	//@TODO: See if there's a way to remove the need for this data structure here
 	FTangoPoseData BlueprintFriendlyPoseData;
+	TangoSpaceConversions::TangoSpaceConversionPair SpaceConverter;
+	bool bIsValidQuery = TangoSpaceConversions::GetSpaceConversionPair(SpaceConverter, FrameOfReference);
+
+	if (!bIsValidQuery)
+	{
+		UE_LOG(ProjectTangoPlugin, Warning, TEXT("UTangoDeviceMotion::GetPoseAtTime: Query not valid"));
+		BlueprintFriendlyPoseData.StatusCode = ETangoPoseStatus::INVALID;
+		return BlueprintFriendlyPoseData;
+	}
+
+	if (SpaceConverter.bIsStatic)//Just querying extrinsics
+	{
+		TangoSpaceConversions::ModifyPose(BlueprintFriendlyPoseData, SpaceConverter);
+		BlueprintFriendlyPoseData.Timestamp = Timestamp;
+		return BlueprintFriendlyPoseData;
+	}
+	else if (SpaceConverter.bNeedToBeQueriedFromDevice)
+	{
+		FrameOfReference.TargetFrame = ETangoCoordinateFrameType::DEVICE;
+	}
 
 #if PLATFORM_ANDROID
 	TangoPoseData Result;
 
 	////Remember to observe the Tango status in case the system isn't ready yet
 	TangoErrorType ResultOfServiceCall;
-
-	ResultOfServiceCall = TangoService_getPoseAtTime(static_cast<double> (Timestamp), ToCObject(FrameOfReference), &Result);
-
-	if (ResultOfServiceCall != TANGO_SUCCESS)
+	if (TangoService_getPoseAtTime(static_cast<double> (Timestamp), ToCObject(FrameOfReference), &Result) != TANGO_SUCCESS)
 	{
+		UE_LOG(ProjectTangoPlugin, Warning, TEXT("UTangoDeviceMotion::GetPoseAtTime: TangoService_getPoseAtTime not successful"));
 		//return a generic object
 		return FTangoPoseData();
 	}
-
-	BlueprintFriendlyPoseData = FromCObject(Result, UTangoDevice::Get().GetMetersToWorldScale());
+	BlueprintFriendlyPoseData = FromCPointer(&Result);
 #endif
+	TangoSpaceConversions::ModifyPose(BlueprintFriendlyPoseData, SpaceConverter);
 	return BlueprintFriendlyPoseData;
 }
 
@@ -119,17 +162,22 @@ void UTangoDeviceMotion::Tick(float DeltaTime)
 {
 	PoseMutex.Lock();
 	TMap<FTangoCoordinateFramePair, FTangoPoseData> BroadcastTangoPoseDataCopy = BroadcastTangoPoseData;
-	BroadcastTangoPoseData.Empty(CurrentlyRequestedPairs.Num());
+	BroadcastTangoPoseData.Empty(RequestedPairs.Num());
 	PoseMutex.Unlock();
 	
 	for (auto& Elem : BroadcastTangoPoseDataCopy)
 	{
-		auto& Components = FramePairToComponents[Elem.Key];
-		for (int32 ID : Components)
+		auto& BroadCastPairs = RequestedPairs[Elem.Key];
+		for (auto& BroadCastPair : BroadCastPairs)
 		{
-			if (UTangoDevice::Get().MotionComponents[ID] != nullptr)
+			FTangoPoseData Pose = Elem.Value;
+			TangoSpaceConversions::ModifyPose(Pose, BroadCastPair.Value.RequestedSpace);
+			for (int32 ComponentID : BroadCastPair.Value.ComponentIDs)
 			{
-				UTangoDevice::Get().MotionComponents[ID]->OnTangoPoseAvailable.Broadcast(Elem.Value,Elem.Key);
+				if (UTangoDevice::Get().MotionComponents[ComponentID] != nullptr)
+				{
+					UTangoDevice::Get().MotionComponents[ComponentID]->OnTangoPoseAvailable.Broadcast(Pose, BroadCastPair.Key);
+				}
 			}
 		}
 	}
@@ -163,15 +211,12 @@ bool UTangoDeviceMotion::IsLocalized()
 		}
 		else
 		{
-			//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Yellow, FString::Printf(TEXT("Pose obtained and is invalid.")));
 			return false;
 		}
 	}
 	else
 	{
 		UE_LOG(ProjectTangoPlugin, Log, TEXT("TangoDeviceAreaLearning::IsLocalized: Could not successfully call GetPoseAtTime!"));
-		//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, FString::Printf(TEXT("Pose not obtained!")));
-
 		return false;
 	}
 
@@ -183,63 +228,50 @@ bool UTangoDeviceMotion::IsLocalized()
 void UTangoDeviceMotion::CheckForChangeInRequests()
 {
 	UE_LOG(ProjectTangoPlugin, Log, TEXT("UTangoDeviceMotion::CheckForChangeInRequests: Called"));
-	TArray<FTangoCoordinateFramePair> NewRequestedPairs;
+	TMap<FTangoCoordinateFramePair, TMap<FTangoCoordinateFramePair,MotionEventRequestedFramePair>> NewRequestedPairs;
 	for (int32 mc = 0; mc < UTangoDevice::Get().RequestedPairs.Num(); mc++)
 	{
 		for (int32 i = 0; i < UTangoDevice::Get().RequestedPairs[mc].Num(); ++i)
 		{
-			NewRequestedPairs.AddUnique(UTangoDevice::Get().RequestedPairs[mc][i]);
+			TangoSpaceConversions::TangoSpaceConversionPair RequestPairSpace; //We cannot request any pair so we have to look stuff up
+			if (TangoSpaceConversions::GetSpaceConversionPair(RequestPairSpace, UTangoDevice::Get().RequestedPairs[mc][i]))
+			{
+				FTangoCoordinateFramePair TrueRequestPair;
+				if (RequestPairSpace.bNeedToBeQueriedFromDevice)
+				{
+					TrueRequestPair = FTangoCoordinateFramePair(UTangoDevice::Get().RequestedPairs[mc][i].BaseFrame,ETangoCoordinateFrameType::DEVICE);
+				}
+				else if(RequestPairSpace.bIsStatic)//Ignore static ones
+				{
+					continue;
+				}
+				else
+				{
+					TrueRequestPair = UTangoDevice::Get().RequestedPairs[mc][i];
+				}
+				//Now add this to NewRequestedPairs in order to rebuild it.
+				auto& RequestMap = NewRequestedPairs.FindOrAdd(TrueRequestPair);
+				auto& Entry = RequestMap.FindOrAdd(RequestPairSpace.Pair);
+				Entry.RequestedSpace = RequestPairSpace;
+				Entry.ComponentIDs.AddUnique(mc);
+			}
 		}
 	}
-	bool bAreDifferent = false;
-	NewRequestedPairs.Sort([](const FTangoCoordinateFramePair& A,const FTangoCoordinateFramePair& B) {return GetTypeHash(A) < GetTypeHash(B); });
-	if (NewRequestedPairs.Num() == CurrentlyRequestedPairs.Num())
+	if (NewRequestedPairs.Num() == RequestedPairs.Num())
 	{
-		for (int i = 0; i < NewRequestedPairs.Num();++i)
+		for (auto& Elem : NewRequestedPairs)
 		{
-			if (NewRequestedPairs[i].BaseFrame != CurrentlyRequestedPairs[i].BaseFrame || NewRequestedPairs[i].TargetFrame != CurrentlyRequestedPairs[i].TargetFrame)
+			if (!RequestedPairs.Contains(Elem.Key))
 			{
-				bAreDifferent = true;
+				ConnectCallback();
 				break;
 			}
 		}
 	}
 	else
 	{
-		bAreDifferent = true;
+		ConnectCallback();
 	}
-	if (bAreDifferent)
-	{
-		CurrentlyRequestedPairs = NewRequestedPairs;
-		if (bCallbackIsConnected)
-		{
-			ConnectCallback();
-		}
-	}
-	RebuildFramePairToComponents();
+	RequestedPairs = NewRequestedPairs;
 	UE_LOG(ProjectTangoPlugin, Log, TEXT("UTangoDeviceMotion::CheckForChangeInRequests: Finished"));
 }
-
-void UTangoDeviceMotion::RebuildFramePairToComponents()
-{
-	UE_LOG(ProjectTangoPlugin, Log, TEXT("UTangoDeviceMotion::RebuildFramePairToComponents: Called"));
-	FramePairToComponents.Empty(CurrentlyRequestedPairs.Num());
-	for (auto& Elem : CurrentlyRequestedPairs)
-	{
-		TArray<int32> ComponentArray;
-		for (int i = 0; i < UTangoDevice::Get().RequestedPairs.Num(); ++i)
-		{
-			for (int j = 0; j < UTangoDevice::Get().RequestedPairs[i].Num();++j)
-			{
-				if (UTangoDevice::Get().RequestedPairs[i][j].BaseFrame == Elem.BaseFrame && UTangoDevice::Get().RequestedPairs[i][j].TargetFrame == Elem.TargetFrame)
-				{
-					ComponentArray.Emplace(i);
-					break;
-				}
-			}
-		}
-		FramePairToComponents.Emplace(Elem, ComponentArray);
-	}
-	UE_LOG(ProjectTangoPlugin, Log, TEXT("UTangoDeviceMotion::RebuildFramePairToComponents: Finished"));
-}
-//END - Tango Motion functions

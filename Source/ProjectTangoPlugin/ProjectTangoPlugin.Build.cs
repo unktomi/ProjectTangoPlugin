@@ -55,7 +55,10 @@ public class ProjectTangoPlugin : ModuleRules
 		{
 			PrivateDependencyModuleNames.Add("Launch");
 			AdditionalPropertiesForReceipt.Add(new ReceiptProperty("AndroidPlugin", Path.Combine(ModuleDirectory, "ProjectTangoPlugin_APL.xml")));
-			PublicAdditionalLibraries.Add(Path.Combine(ModuleDirectory, "../../ThirdParty/libtango_client_api.so"));
+            //@NOTE: is the include here now attempting to load the public library as well as the APL.xml include?
+            PublicAdditionalLibraries.Add(Path.Combine(ModuleDirectory, "../../ThirdParty/libtango_client_api.so"));
+
+            
 		}
 	}
 }

@@ -37,54 +37,46 @@ bool UTangoAreaLearningComponent::IsLearningModeEnabled()
 	return UTangoDevice::Get().IsLearningModeEnabled();
 }
 
-FTangoAreaDescription UTangoAreaLearningComponent::SaveCurrentArea(FString Filename, bool& IsSuccessful)
+FTangoAreaDescription UTangoAreaLearningComponent::SaveCurrentArea(FString Filename, bool& bIsSuccessful)
 {
 	if (UTangoDevice::Get().getTangoDeviceAreaLearningPointer())
 	{
-		return UTangoDevice::Get().getTangoDeviceAreaLearningPointer()->SaveCurrentArea(Filename, IsSuccessful);
+     	return UTangoDevice::Get().getTangoDeviceAreaLearningPointer()->SaveCurrentArea(Filename, bIsSuccessful);
 	}
 	else
 	{
 		UE_LOG(ProjectTangoPlugin, Warning, TEXT("UTangoAreaLearningComponent::SaveCurrentArea: Tango Area Learning not enabled"));
+        bIsSuccessful = false;
 		return FTangoAreaDescription();
 	}
 
 }
 
-FTangoAreaDescriptionMetaData UTangoAreaLearningComponent::GetMetaData(FString UUID, bool& IsSuccessful)
+FTangoAreaDescriptionMetaData UTangoAreaLearningComponent::GetMetaData(FTangoAreaDescription AreaDescription, bool& bIsSuccessful)
 {
-	UE_LOG(ProjectTangoPlugin, Warning, TEXT("UTangoAreaLearningComponent::GetMetaData: Starting metadata get."));
+	UE_LOG(ProjectTangoPlugin, Log, TEXT("UTangoAreaLearningComponent::GetMetaData: Starting metadata get."));
 
-	return UTangoDevice::Get().GetMetaData(UUID, IsSuccessful);
+	return UTangoDevice::Get().GetMetaData(AreaDescription.UUID, bIsSuccessful);
 }
 
 
-void UTangoAreaLearningComponent::SaveMetaData(FString UUID, FTangoAreaDescriptionMetaData NewMetadata, bool& IsSuccessful)
+void UTangoAreaLearningComponent::SaveMetaData(FTangoAreaDescription AreaDescription, FTangoAreaDescriptionMetaData NewMetadata, bool& bIsSuccessful)
 {
-	UE_LOG(ProjectTangoPlugin, Warning, TEXT("UTangoAreaLearningComponent::SaveMetaData: Starting metadata save."));
-
-	if (UTangoDevice::Get().getTangoDeviceAreaLearningPointer())
-	{
-		UTangoDevice::Get().getTangoDeviceAreaLearningPointer()->SaveMetaData(UUID, NewMetadata, IsSuccessful);
-	}
-	else
-	{
-		UE_LOG(ProjectTangoPlugin, Warning, TEXT("UTangoAreaLearningComponent::SaveMetaData: Tango Area Learning pointer not present."))
-		IsSuccessful = false;
-	}
+	UE_LOG(ProjectTangoPlugin, Log, TEXT("UTangoAreaLearningComponent::SaveMetaData: Starting metadata save."));
+    UTangoDevice::Get().SaveMetaData(AreaDescription.UUID, NewMetadata, bIsSuccessful);
 	return;
 }
 
-void UTangoAreaLearningComponent::ImportADF(FString Filepath, bool& IsSuccessful)
+void UTangoAreaLearningComponent::ImportADF(FString Filepath, bool& bIsSuccessful)
 {
-	UE_LOG(ProjectTangoPlugin, Warning, TEXT("UTangoAreaLearningComponent::ImportADF: Starting Area import."));
+	UE_LOG(ProjectTangoPlugin, Log, TEXT("UTangoAreaLearningComponent::ImportADF: Starting Area import."));
 
-	UTangoDevice::Get().ImportCurrentArea(Filepath, IsSuccessful);
+	UTangoDevice::Get().ImportCurrentArea(Filepath, bIsSuccessful);
 }
 
-void UTangoAreaLearningComponent::ExportADF(FString UUID, FString Filepath, bool& IsSuccessful)
+void UTangoAreaLearningComponent::ExportADF(FString UUID, FString Filepath, bool& bIsSuccessful)
 {
-	UE_LOG(ProjectTangoPlugin, Warning, TEXT("UTangoAreaLearningComponent::ExportADF: Starting area export."));
+	UE_LOG(ProjectTangoPlugin, Log, TEXT("UTangoAreaLearningComponent::ExportADF: Starting area export."));
 
-	UTangoDevice::Get().ExportCurrentArea(UUID, Filepath, IsSuccessful);
+	UTangoDevice::Get().ExportCurrentArea(UUID, Filepath, bIsSuccessful);
 }

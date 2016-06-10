@@ -21,21 +21,18 @@ void UTangoDeviceImage::Init(
 #endif
 	)
 {
-	UE_LOG(ProjectTangoPlugin, Error, TEXT("UTangoDeviceImage: Constructer called"));
+	UE_LOG(ProjectTangoPlugin, Log, TEXT("UTangoDeviceImage: Constructor called"));
 
-	/*bIsImageBufferSet = false;
-	ImageBufferWidth = 0;
-	ImageBufferHeight = 0;*/
+	State = DISCONNECTED;
 
 	ImageBufferTimestamp = 0;
 	bTexturesHaveDataInThem = false;
-	CallbackConnected = false;
-	WantToConnectCallbacks = false;
-	NewDataAvailable = false;
+	bNewDataAvailable = false;
 #if PLATFORM_ANDROID
 	CreateYUVTextures(config_);
 #endif
-	UE_LOG(ProjectTangoPlugin, Error, TEXT("UTangoDeviceImage: Constructer finished"));
+
+	UE_LOG(ProjectTangoPlugin, Log, TEXT("UTangoDeviceImage: Constructor finished"));
 }
 
 bool UTangoDeviceImage::CreateYUVTextures(
@@ -44,32 +41,34 @@ bool UTangoDeviceImage::CreateYUVTextures(
 #endif
 	)
 {
-	UE_LOG(ProjectTangoPlugin, Error, TEXT("UTangoDeviceImage: CreateYUVTextures called"));
+	UE_LOG(ProjectTangoPlugin, Log, TEXT("UTangoDeviceImage: CreateYUVTextures called"));
 #if PLATFORM_ANDROID
 	int32 YTextureWidth = 0;
 	int32 YTextureHeight = 0;
 	int32 uvTextureWidth = 0;
 	int32 uvTextureHeight = 0;
 
-	bool success = true;
-	success = TangoConfig_getInt32(config_,"experimental_color_y_tex_data_width", &YTextureWidth) == TANGO_SUCCESS && success;
-	success = TangoConfig_getInt32(config_, "experimental_color_y_tex_data_height", &YTextureHeight) == TANGO_SUCCESS && success;
-	success = TangoConfig_getInt32(config_, "experimental_color_uv_tex_data_width", &uvTextureWidth) == TANGO_SUCCESS && success;
-	success = TangoConfig_getInt32(config_, "experimental_color_uv_tex_data_height", &uvTextureHeight) == TANGO_SUCCESS && success;
+	bool bSuccess = true;
+	bSuccess = TangoConfig_getInt32(config_,"experimental_color_y_tex_data_width", &YTextureWidth) == TANGO_SUCCESS && bSuccess;
+	bSuccess = TangoConfig_getInt32(config_, "experimental_color_y_tex_data_height", &YTextureHeight) == TANGO_SUCCESS && bSuccess;
+	bSuccess = TangoConfig_getInt32(config_, "experimental_color_uv_tex_data_width", &uvTextureWidth) == TANGO_SUCCESS && bSuccess;
+	bSuccess = TangoConfig_getInt32(config_, "experimental_color_uv_tex_data_height", &uvTextureHeight) == TANGO_SUCCESS && bSuccess;
 
-	if (!success || YTextureWidth == 0 || YTextureHeight == 0 || uvTextureWidth == 0 || uvTextureHeight == 0)
+	if (!bSuccess || YTextureWidth == 0 || YTextureHeight == 0 || uvTextureWidth == 0 || uvTextureHeight == 0)
 	{
 		UE_LOG(ProjectTangoPlugin, Error, TEXT("Fetched camera texture sizes are invalid"));
 		return false;
 	}
 	else
-		UE_LOG(ProjectTangoPlugin, Error, TEXT("UTangoDevice::Get().YTextureWidth %d UTangoDevice::Get().YTextureHeight %d uvTextureWidth %d uvTextureHeight %d"), YTextureWidth, YTextureHeight, uvTextureWidth, uvTextureHeight);
-
+    {
+		UE_LOG(ProjectTangoPlugin, Log, TEXT("UTangoDevice::Get().YTextureWidth %d UTangoDevice::Get().YTextureHeight %d uvTextureWidth %d uvTextureHeight %d"), YTextureWidth, YTextureHeight, uvTextureWidth, uvTextureHeight);
+    }
+    
 	if (UTangoDevice::Get().YTexture == nullptr)
 	{
-		UTangoDevice::Get().YTexture = UTexture2D::CreateTransient(YTextureWidth, YTextureHeight, PF_R8G8B8A8);
-		UTangoDevice::Get().CrTexture = UTexture2D::CreateTransient(uvTextureWidth, uvTextureHeight, PF_R8G8B8A8);
-		UTangoDevice::Get().CbTexture = UTexture2D::CreateTransient(uvTextureWidth, uvTextureHeight, PF_R8G8B8A8);
+		UTangoDevice::Get().YTexture = UTexture2D::CreateTransient(1, 1, PF_R8G8B8A8);
+		UTangoDevice::Get().CrTexture = UTexture2D::CreateTransient(1, 1, PF_R8G8B8A8);
+		UTangoDevice::Get().CbTexture = UTexture2D::CreateTransient(1, 1, PF_R8G8B8A8);
 
 		UTangoDevice::Get().YTexture->Filter = TF_Nearest;
 		UTangoDevice::Get().CrTexture->Filter = TF_Nearest;
@@ -90,63 +89,59 @@ bool UTangoDeviceImage::CreateYUVTextures(
 
 
 #endif
-	UE_LOG(ProjectTangoPlugin, Error, TEXT("UTangoDeviceImage: CreateYUVTextures FINISHED"));
+	UE_LOG(ProjectTangoPlugin, Log, TEXT("UTangoDeviceImage: CreateYUVTextures FINISHED"));
 	return true;
 }
 
 bool UTangoDeviceImage::setRuntimeConfig(FTangoRuntimeConfig & runtimeConfig)
 {
-	if (runtimeConfig.EnableColorCamera)
+	if (runtimeConfig.bEnableColorCamera)
 	{
-		if (!CallbackConnected)
+		if (State == DISCONNECTED)
 		{
 			ConnectCallback();
 		}
 		return true;
 	}
-	else if(CallbackConnected)
+	else if(State == CONNECTED)
 	{
 		return DisconnectCallback();
 	}
-	else if (WantToConnectCallbacks)
-	{
-		WantToConnectCallbacks = false;
-		return true;
-	}
 	else
 	{
+		State = DISCONNECTED;
 		return true;
 	}
 }
 
 bool UTangoDeviceImage::DisconnectCallback()
 {
-	if (!CallbackConnected)
+	if (State == DISCONNECTED)
 	{
 		return true;
 	}
 	else
 	{
-		bool success = true;
+		bool bSuccess = true;
 #if PLATFORM_ANDROID
-		success = TangoService_disconnectCamera(TANGO_CAMERA_COLOR) == TANGO_SUCCESS;
+		bSuccess = TangoService_disconnectCamera(TANGO_CAMERA_COLOR) == TANGO_SUCCESS;
 #endif
-		if (success == true)
+		if (bSuccess == true)
 		{
-			CallbackConnected = false;
+			State = DISCONNECTED;
 		}
-		return success;
+		return bSuccess;
 	}
 }
 
 void UTangoDeviceImage::OnNewDataAvailable()
 {
-	NewDataAvailable = true;
+	bNewDataAvailable = true;
 }
 
 void UTangoDeviceImage::ConnectCallback()
 {
-	WantToConnectCallbacks = true;
+	State = WANTTOCONNECT;
 }
 
 bool UTangoDeviceImage::TexturesReady()
@@ -161,7 +156,7 @@ bool UTangoDeviceImage::TexturesReady()
 		UE_LOG(ProjectTangoPlugin, Error, TEXT("UTangoDeviceImage::TexturesReady: UTangoDeviceImage: RegisterCallbacks Not IsValidLowLevel"));
 		return false;
 	}
-	if (!(UTangoDevice::Get().YTexture->Resource || UTangoDevice::Get().CrTexture->Resource || UTangoDevice::Get().CbTexture->Resource))//@TODO: Really neccessary?
+	if (!(UTangoDevice::Get().YTexture->Resource || UTangoDevice::Get().CrTexture->Resource || UTangoDevice::Get().CbTexture->Resource))
 	{
 		UE_LOG(ProjectTangoPlugin, Error, TEXT("UTangoDeviceImage::TexturesReady: UTangoDeviceImage: RegisterCallbacks Not Resource"));
 		return false;
@@ -187,29 +182,32 @@ bool UTangoDeviceImage::TexturesReady()
 
 void UTangoDeviceImage::CheckConnectCallback()
 {
-	if (!WantToConnectCallbacks)
+	if (State != WANTTOCONNECT)
 	{
 		return;
 	}
-	UE_LOG(ProjectTangoPlugin, Error, TEXT("UTangoDeviceImage::CheckConnectCallback: UTangoDeviceImage: RegisterCallbacks called"))
+	UE_LOG(ProjectTangoPlugin, Log, TEXT("UTangoDeviceImage::CheckConnectCallback: UTangoDeviceImage: RegisterCallbacks called"))
 #if PLATFORM_ANDROID
-	if (!TexturesReady())
-	{
-		return;
-	}
+		if (!TexturesReady())
+		{
+			return;
+		}
+	State = CONNECTSHEDULED;
 
-	//FTextureRHIRef YTex = UTangoDevice::Get().YTexture->Resource->TextureRHI;
-	//FTextureRHIRef CrTex = UTangoDevice::Get().CrTexture->Resource->TextureRHI;
-	//FTextureRHIRef CbTex = UTangoDevice::Get().CbTexture->Resource->TextureRHI;
-
-	ENQUEUE_UNIQUE_RENDER_COMMAND_THREEPARAMETER(ConnectTangoCallback,
+	ENQUEUE_UNIQUE_RENDER_COMMAND_FOURPARAMETER(ConnectTangoCallback,
 		FTextureRHIRef, YTex, UTangoDevice::Get().YTexture->Resource->TextureRHI,
 		FTextureRHIRef, CrTex, UTangoDevice::Get().CrTexture->Resource->TextureRHI,
 		FTextureRHIRef, CbTex, UTangoDevice::Get().CbTexture->Resource->TextureRHI,
+		ConnectionState*, StateRef, &State,
 		{
-			if (!(YTex || CrTex || CbTex))//@TODO: Really neccessary?
+			if (*StateRef != CONNECTSHEDULED)
+			{
+				return;
+			}
+			if (!(YTex || CrTex || CbTex))
 			{
 				UE_LOG(ProjectTangoPlugin, Error, TEXT("UTangoDeviceImage::CheckConnectCallback: UTangoDeviceImage: RegisterCallbacks Not TextureRHI"));
+				*StateRef = WANTTOCONNECT;
 				return;
 			}
 
@@ -217,49 +215,37 @@ void UTangoDeviceImage::CheckConnectCallback()
 			void* YRes = YTex->GetNativeResource();
 			void* CrRes = CrTex->GetNativeResource();
 			void* CbRes = CbTex->GetNativeResource();
-			if (YRes == nullptr || CrRes == nullptr || CbRes == nullptr)//@TODO: Really neccessary?
+			if (YRes == nullptr || CrRes == nullptr || CbRes == nullptr)
 			{
 				UE_LOG(ProjectTangoPlugin, Error, TEXT("UTangoDeviceImage::CheckConnectCallback: UTangoDeviceImage: RegisterCallbacks Not GetNativeResource"));
+				*StateRef = WANTTOCONNECT;
 				return;
 			}
 			uint32  YOpenGLPointer = static_cast<uint32>(*reinterpret_cast<int32*>(YRes));
 			uint32 CrOpenGLPointer = static_cast<uint32>(*reinterpret_cast<int32*>(CrRes));
 			uint32 CbOpenGLPointer = static_cast<uint32>(*reinterpret_cast<int32*>(CbRes));
 			UE_LOG(ProjectTangoPlugin, Log, TEXT("UTangoDeviceImage::CheckConnectCallback: Registering Callback"));
-
-			//TangoService_connectTextureId(TANGO_CAMERA_COLOR, YOpenGLPointer, this,
-			//	[](void*, TangoCameraId id) {if (id == TANGO_CAMERA_COLOR && UTangoDevice::Get().getTangoDeviceImagePointer() != nullptr) UTangoDevice::Get().getTangoDeviceImagePointer()->OnNewDataAvailable(); }
-			//);
-			TangoService_Experimental_connectTextureIdUnity(TANGO_CAMERA_COLOR, YOpenGLPointer, CbOpenGLPointer, CrOpenGLPointer, this,
-				[](void*, TangoCameraId id) {if (id == TANGO_CAMERA_COLOR && UTangoDevice::Get().getTangoDeviceImagePointer() != nullptr) UTangoDevice::Get().getTangoDeviceImagePointer()->OnNewDataAvailable(); }
-			);
+			if (*StateRef == CONNECTSHEDULED)
+			{
+				*StateRef = CONNECTED;
+				TangoService_Experimental_connectTextureIdUnity(TANGO_CAMERA_COLOR, YOpenGLPointer, CbOpenGLPointer, CrOpenGLPointer, this,
+					[](void*, TangoCameraId id) {if (id == TANGO_CAMERA_COLOR && UTangoDevice::Get().getTangoDeviceImagePointer() != nullptr) UTangoDevice::Get().getTangoDeviceImagePointer()->OnNewDataAvailable(); }
+				);
+			}
 		});
 #endif
-	WantToConnectCallbacks = false;
-	CallbackConnected = true;
-	UE_LOG(ProjectTangoPlugin, Error, TEXT("UTangoDeviceImage::CheckConnectCallback: UTangoDeviceImage: RegisterCallbacks FINISHED"));
+	UE_LOG(ProjectTangoPlugin, Log, TEXT("UTangoDeviceImage::CheckConnectCallback: UTangoDeviceImage: RegisterCallbacks FINISHED"));
 }
 
 void UTangoDeviceImage::TickByDevice()
 {
 	CheckConnectCallback();
-#if PLATFORM_ANDROID
-	if (NewDataAvailable)
+	if (!ViewExtension.IsValid() && GEngine)
 	{
-		ENQUEUE_UNIQUE_RENDER_COMMAND(TangoUpdateTexture,
-		{
-			if (TangoService_updateTexture(TANGO_CAMERA_COLOR, &ImageBufferTimestamp) != TANGO_SUCCESS)
-			{
-				UE_LOG(ProjectTangoPlugin, Log, TEXT("UTangoDeviceImage::TickByDevice: Tango Texture Update FAILED"));
-			}
-			else
-			{
-				bTexturesHaveDataInThem = true;
-			}
-		});
-		NewDataAvailable = false;
+		TSharedPtr< FTangoViewExtension, ESPMode::ThreadSafe > NewViewExtension(new FTangoViewExtension(nullptr));
+		ViewExtension = NewViewExtension;
+		GEngine->ViewExtensions.Add(ViewExtension);
 	}
-#endif
 }
 
 UTexture* UTangoDeviceImage::GetYTexture()
@@ -300,8 +286,13 @@ UTexture* UTangoDeviceImage::GetCbTexture()
 
 void UTangoDeviceImage::BeginDestroy()
 {
+	if (ViewExtension.IsValid() && GEngine)
+	{
+		GEngine->ViewExtensions.Remove(ViewExtension);
+	}
+	ViewExtension.Reset();
 	Super::BeginDestroy();
-	UE_LOG(ProjectTangoPlugin, Error, TEXT("UTangoDeviceImage::BeginDestroy: destructor called"));
+	UE_LOG(ProjectTangoPlugin, Log, TEXT("UTangoDeviceImage::BeginDestroy: destructor called"));
 	DisconnectCallback();
 }
 

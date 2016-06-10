@@ -14,6 +14,7 @@ limitations under the License.*/
 #pragma once
 
 #include "TangoMotionComponent.h"
+#include "TangoCoordinateConversions.h"
 
 #if PLATFORM_ANDROID
 #include "tango_client_api.h"
@@ -48,7 +49,6 @@ public:
 	bool IsLocalized();
 
 	void CheckForChangeInRequests();
-	void RebuildFramePairToComponents();
 
 private:
 	bool bIsProperlyInitialized = false;
@@ -61,8 +61,14 @@ private:
 
 
 	bool bCallbackIsConnected = false;
-	TArray<FTangoCoordinateFramePair> CurrentlyRequestedPairs;
-	TMap<FTangoCoordinateFramePair, TArray<int32>> FramePairToComponents;
+
+	struct MotionEventRequestedFramePair
+	{
+		TangoSpaceConversions::TangoSpaceConversionPair RequestedSpace;
+		TArray<int32> ComponentIDs;
+	};
+
+	TMap<FTangoCoordinateFramePair, TMap<FTangoCoordinateFramePair,MotionEventRequestedFramePair>> RequestedPairs;
 	//Stuff used in the Tangothread:
 	TMap<FTangoCoordinateFramePair, FTangoPoseData> BroadcastTangoPoseData;
 };

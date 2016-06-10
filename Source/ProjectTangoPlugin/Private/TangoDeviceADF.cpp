@@ -65,7 +65,7 @@ TArray<FTangoAreaDescription> UTangoDevice::GetAreaDescriptions()
 	return AreaDescriptions;
 }
 
-FTangoAreaDescriptionMetaData UTangoDevice::GetMetaData(FString UUID, bool& IsSuccessful)
+FTangoAreaDescriptionMetaData UTangoDevice::GetMetaData(FString UUID, bool& bIsSuccessful)
 {
 	//Set up return variables
 	FTangoAreaDescriptionMetaData Result = FTangoAreaDescriptionMetaData();
@@ -102,7 +102,7 @@ FTangoAreaDescriptionMetaData UTangoDevice::GetMetaData(FString UUID, bool& IsSu
 	//Poll service & populate metadata pointer
 	if (TangoService_getAreaDescriptionMetadata(ConvertedUUIDKeyCString, &Metadata) != TANGO_SUCCESS)
 	{
-		IsSuccessful = false;
+		bIsSuccessful = false;
 		UE_LOG(ProjectTangoPlugin, Error, TEXT("TangoDeviceAreaLearning::GetMetaData: Could not get Metadata object."));
 		return FTangoAreaDescriptionMetaData();
 	}
@@ -132,20 +132,20 @@ FTangoAreaDescriptionMetaData UTangoDevice::GetMetaData(FString UUID, bool& IsSu
 				NativeInteger = *(reinterpret_cast<uint64*>(DatePointer));
 				int32 ConvertedInteger = static_cast<int32>(NativeInteger);
 				Result.MillisecondsSinceUnixEpoch = ConvertedInteger;
-				IsSuccessful = true;
+				bIsSuccessful = true;
 			}
 			else
 			{
 				//Result was not successful!
 				UE_LOG(ProjectTangoPlugin, Error, TEXT("TangoDeviceAreaLearning::GetMetaData: Could not get Date."));
-				IsSuccessful = false;
+				bIsSuccessful = false;
 			}
 		}
 		else
 		{
 			//Result was not successful!
 			UE_LOG(ProjectTangoPlugin, Error, TEXT("TangoDeviceAreaLearning::GetMetaData: Could not get Transformation."));
-			IsSuccessful = false;
+			bIsSuccessful = false;
 		}
 	}
 	else
@@ -153,14 +153,73 @@ FTangoAreaDescriptionMetaData UTangoDevice::GetMetaData(FString UUID, bool& IsSu
 		//Result was not successful!
 		UE_LOG(ProjectTangoPlugin, Error, TEXT("TangoDeviceAreaLearning::GetMetaData: Could not get Name string."));
 
-		IsSuccessful = false;
+		bIsSuccessful = false;
 	}
 
 #endif
 	return Result;
 }
 
-void UTangoDevice::ImportCurrentArea(FString Filepath, bool&IsSuccessful)
+
+void UTangoDevice::SaveMetaData(FString UUID, FTangoAreaDescriptionMetaData NewMetadata, bool& bIsSuccessful)
+{
+    bIsSuccessful = false;
+    
+#if PLATFORM_ANDROID
+    TangoAreaDescriptionMetadata Metadata;
+    
+    //Filename argument conversion
+    const char* NameKey = "name"; //key for filename
+    std::string ConvertedName = TCHAR_TO_UTF8(*(NewMetadata.Filename));
+    const char* NameValue = ConvertedName.c_str();
+    
+    std::string ConvertedUUID = TCHAR_TO_UTF8(*UUID);
+    const char* ConvertedUUIDValue = ConvertedUUID.c_str();
+    
+    const char* TransformationKey = "transformation";
+    std::string ConvertedTransformationKey = TCHAR_TO_UTF8(TransformationKey);
+    
+    double TransformationElements[7] = { 0, 0, 0, 0, 0, 0, 1 };
+    //@TODO: Replace these magic numbers (8: bytes per double value, 7: number of elements in array) with constant values
+    uint TransformationArrayByteCount = (uint)(8 * 7);
+    
+    //Translation
+    TransformationElements[0] = NewMetadata.TransformationX;
+    TransformationElements[1] = NewMetadata.TransformationY;
+    TransformationElements[2] = NewMetadata.TransformationZ;
+    TransformationElements[3] = NewMetadata.TransformationQX;
+    TransformationElements[4] = NewMetadata.TransformationQY;
+    TransformationElements[5] = NewMetadata.TransformationQZ;
+    TransformationElements[6] = NewMetadata.TransformationQW;
+    
+    if (TangoService_getAreaDescriptionMetadata(ConvertedUUIDValue, &Metadata) != TANGO_SUCCESS)
+    {
+        UE_LOG(ProjectTangoPlugin, Error, TEXT("TangoDeviceAreaLearning::SaveMetaData: Call to get MetaData pointer from Tango was not successful, could not save metadata!"));
+        bIsSuccessful = false;
+        return;
+    }
+    
+    if((TangoAreaDescriptionMetadata_set(Metadata, NameKey, (NewMetadata.Filename).Len(), NameValue) != TANGO_SUCCESS)
+       || (TangoAreaDescriptionMetadata_set(Metadata, TransformationKey, TransformationArrayByteCount, (char*)(TransformationElements)) != TANGO_SUCCESS)
+       || (TangoService_saveAreaDescriptionMetadata(ConvertedUUIDValue, Metadata) != TANGO_SUCCESS))
+    {
+        //Failed to save data!
+        UE_LOG(ProjectTangoPlugin, Error, TEXT("TangoDeviceAreaLearning::SaveMetaData: Calls to Tango were not successful, could not save metadata!"));
+        bIsSuccessful = false;
+    }
+    else
+    {
+        bIsSuccessful = true;
+        //Saved data correctly.
+        UE_LOG(ProjectTangoPlugin, Log, TEXT("TangoDeviceAreaLearning::SaveMetaData: successfully overwrote file metadata."));
+    }
+    TangoAreaDescriptionMetadata_free(Metadata);
+#endif
+}
+
+
+
+void UTangoDevice::ImportCurrentArea(FString Filepath, bool &bIsSuccessful)
 {
 	UE_LOG(ProjectTangoPlugin, Log, TEXT("TangoDeviceAreaLearning::ImportCurrentArea: Starting import"));
 
@@ -174,19 +233,19 @@ void UTangoDevice::ImportCurrentArea(FString Filepath, bool&IsSuccessful)
 
 		static jmethodID ADFImportIntentMethod = FJavaWrapper::FindMethod(Env, FJavaWrapper::GameActivityClassID, "AndroidThunkJava_RequestImportPermission", "(Ljava/lang/String;)V", false);
 		FJavaWrapper::CallVoidMethod(Env, FJavaWrapper::GameActivityThis, ADFImportIntentMethod, TangoImportFilenameArg);
+        bIsSuccessful = true;
 	}
 	else
 	{
-		UE_LOG(ProjectTangoPlugin, Log, TEXT("TangoDeviceAreaLearning::ImportCurrentArea: Error: Could not get Java environment!"));
+		UE_LOG(ProjectTangoPlugin, Error, TEXT("TangoDeviceAreaLearning::ImportCurrentArea: Could not get Java environment!"));
+        bIsSuccessful = false;
 	}
 
 #endif
-
-	return;
-
+    UE_LOG(ProjectTangoPlugin, Log, TEXT("TangoDeviceAreaLearning::ExportCurrentArea: Finished import request call"));
 }
 
-void UTangoDevice::ExportCurrentArea(FString UUID, FString Filepath, bool& IsSuccessful)
+void UTangoDevice::ExportCurrentArea(FString UUID, FString Filepath, bool& bIsSuccessful)
 {
 	UE_LOG(ProjectTangoPlugin, Log, TEXT("TangoDeviceAreaLearning::ExportCurrentArea: Starting export"));
 	//Make the call to Java
@@ -203,12 +262,13 @@ void UTangoDevice::ExportCurrentArea(FString UUID, FString Filepath, bool& IsSuc
 		static jmethodID ADFExportIntentMethod = FJavaWrapper::FindMethod(Env, FJavaWrapper::GameActivityClassID, "AndroidThunkJava_RequestExportPermission", "(Ljava/lang/String;Ljava/lang/String;)V", false);
 
 		FJavaWrapper::CallVoidMethod(Env, FJavaWrapper::GameActivityThis, ADFExportIntentMethod, TangoExportUUIDArg, TangoExportFilenameArg);
-
+        bIsSuccessful = true;
 	}
 	else
 	{
-		UE_LOG(ProjectTangoPlugin, Log, TEXT("TangoDeviceAreaLearning::ExportCurrentArea: Error: Could not get Java environment!"));
+		UE_LOG(ProjectTangoPlugin, Error, TEXT("TangoDeviceAreaLearning::ExportCurrentArea: Could not get Java environment!"));
+        bIsSuccessful = false;
 	}
 #endif
-	UE_LOG(ProjectTangoPlugin, Log, TEXT("TangoDeviceAreaLearning::ExportCurrentArea: Finished export"));
+	UE_LOG(ProjectTangoPlugin, Log, TEXT("TangoDeviceAreaLearning::ExportCurrentArea: Finished export request call"));
 }

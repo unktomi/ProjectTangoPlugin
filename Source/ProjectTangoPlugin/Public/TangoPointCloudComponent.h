@@ -14,7 +14,7 @@ limitations under the License.*/
 #include "TangoDataTypes.h"
 #include "TangoPointCloudComponent.generated.h"
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnTangoXYZijDataAvailable, FTangoXYZijData, TangoXYZijData);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnTangoXYZijDataAvailable, float, TimeStamp);
 
 
 UCLASS(ClassGroup = Tango, Blueprintable)
@@ -63,7 +63,7 @@ public:
 	* @return Point from the point cloud in Unreal co-ordinates.
 	*/
 	UFUNCTION(Category = "Tango|Depth", meta = (ToolTip = "Get single point from cloud buffer.", keyword = "depth, point cloud, buffer"), BlueprintPure)
-		FVector GetSinglePoint(int32 Index,float& Timestamp,bool& ValidValue);
+		FVector GetSinglePoint(int32 Index,float& Timestamp,bool& bIsValidValue);
 
 	/*
 	* Retrieves the number of points contained within the latest frame from the point cloud.
@@ -83,7 +83,8 @@ public:
 	* @return Returns closest depth point from the point cloud.
 	*/
 	UFUNCTION(Category = "Tango|Depth", meta = (ToolTip = "Retrieve the closest value to the input screen point from within the point cloud buffer.", keyword = "depth, point cloud, buffer, closest"), BlueprintPure)
-		FVector FindClosestDepthPoint(FVector2D ScreenPoint, float& Timestamp, float MaxDistanceFromPoint = 30);
+		//FVector FindClosestDepthPoint(FVector2D ScreenPoint, float& Timestamp, float MaxDistanceFromPoint = 30);
+		bool FindClosestDepthPoint(UCameraComponent* ViewPoint,FVector2D ScreenPoint,FVector& Result, float& Timestamp, float MaxDistanceFromPoint = 30);
 
 	/*
 	* Get all points from the latest frame of the point cloud within the specified range of the input screen point.
@@ -94,7 +95,7 @@ public:
 	* @return Returns all points from the latest frame of the depth buffer within range of the designated screen point.
 	*/
 	UFUNCTION(Category = "Tango|Depth", meta = (ToolTip = "Get all the points in the point cloud buffer within the range of the input screen point.", keyword = "depth, point cloud, buffer"), BlueprintPure)
-		TArray<FVector> GetAllDepthPointsInArea(FVector2D ScreenPoint, float Range, float& Timestamp);
+		TArray<FVector> GetAllDepthPointsInArea(UCameraComponent* ViewPoint, FVector2D ScreenPoint, float Range, float& Timestamp);
 
 	/*
 	*Retrieve the plane average of the points within range of the input screen point.
@@ -109,7 +110,7 @@ public:
 	* @return Returns true if a plane was successfully retrieved.
 	*/
 	UFUNCTION(Category = "Tango|Depth", meta = (ToolTip = "Retrieve the plane average of the points within range of the input screen point."), BlueprintPure)
-		bool GetPlaneAtScreenCoordinates(FVector2D ScreenPoint, float PointAreaRadius, float MinPercentage, float PointDistanceThreshold, FVector& PlaneCenter, FPlane& Plane, float& Timestamp);
+		bool GetPlaneAtScreenCoordinates(UCameraComponent* ViewPoint, FVector2D ScreenPoint, float PointAreaRadius, float MinPercentage, float PointDistanceThreshold, FVector& PlaneCenter, FPlane& Plane, float& Timestamp);
 
 	/*
 	* Passes a container object for the point cloud data around. Useful to provide other C++ scripts access to the point cloud without any additional copies.
@@ -127,9 +128,6 @@ public:
 	*/
 	UFUNCTION(Category = "Tango|Depth", BlueprintPure, meta = (ToolTip = "Returns the current scale factor to convert Tango distance units to Unreal distance units.", keyword = "depth, scale, factor, world"))
 		float GetCurrentWorldScaleFactor();
-
-	virtual void TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction * ThisTickFunction) override;
-
 private:
 	float LatestDepthTimeStamp;
 
@@ -137,9 +135,7 @@ private:
 	UPROPERTY(transient)
 		UPointCloudContainer* InternalPointCloudContainer;
 
-	void CheckForDepthEvents();
-
-	FVector2D ProjectVectorToScreen(FVector Location, FSceneView* SceneView);
+	FVector2D ProjectVectorToScreen(UCameraComponent* ViewPoint, FVector Location);
 	FVector GetVectorArrayAverage(const TArray<FVector>& Vectors);
 	FPlane MakeRandomPlane(FVector CameraForward, TArray<FVector> Points);
 };

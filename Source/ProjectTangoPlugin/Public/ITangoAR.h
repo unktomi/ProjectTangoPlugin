@@ -10,21 +10,24 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.*/
-#include "TangoDataTypes.h"
 
 #pragma once
-#if PLATFORM_ANDROID
-#include "tango_client_api.h"
-#include <pthread.h>
-#endif
+#include "TangoDataTypes.h"
+#include "ITangoAR.generated.h"
 
-class TangoDeviceAreaLearning
+UINTERFACE(MinimalAPI)
+class UTangoARInterface : public UInterface
 {
-public:
-	TangoDeviceAreaLearning();
-	~TangoDeviceAreaLearning();
+	GENERATED_UINTERFACE_BODY()
+};
 
-	//Tango Area Learning functions
-	bool DeleteAreaDescription(FString UUID);
-	FTangoAreaDescription SaveCurrentArea(FString Filename, bool& bIsSuccessful);
+class ITangoARInterface
+{
+	GENERATED_IINTERFACE_BODY()
+public:
+	virtual FTangoPoseData GetCurrentPoseRENDERTHREAD(float TimeStamp) { return FTangoPoseData(); }
+	virtual AActor* GetActor() { return nullptr; }
+	virtual USceneComponent* AsSceneComponent() { return nullptr;  }
+	virtual FTransform CalcComponentToWorld(FTransform transform) { return FTransform(); }
+	virtual bool WantToDoAR() { return false; }
 };

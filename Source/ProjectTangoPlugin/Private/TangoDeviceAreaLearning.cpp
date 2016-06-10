@@ -34,25 +34,25 @@ TangoDeviceAreaLearning::~TangoDeviceAreaLearning()
 
 bool TangoDeviceAreaLearning::DeleteAreaDescription(FString UUID)
 {
-	bool IsDeleted = false;
+	bool bIsDeleted = false;
 
 #if PLATFORM_ANDROID
 	std::string t = TCHAR_TO_UTF8(*UUID);
 	const char* returnvalue = t.c_str();
 	if (TangoService_deleteAreaDescription(returnvalue) == TANGO_SUCCESS)
 	{
-		IsDeleted = true;
+		bIsDeleted = true;
 	}
 #endif
 
-	return IsDeleted;
+	return bIsDeleted;
 }
 
-FTangoAreaDescription TangoDeviceAreaLearning::SaveCurrentArea(FString Filename, bool& IsSuccessful)
+FTangoAreaDescription TangoDeviceAreaLearning::SaveCurrentArea(FString Filename, bool& bIsSuccessful)
 {
 	UE_LOG(ProjectTangoPlugin, Log, TEXT("TangoDeviceAreaLearning::SaveCurrentArea: Called"));
 	FTangoAreaDescription SavedData;
-	IsSuccessful = false;
+	bIsSuccessful = false;
 
 	if (!UTangoDevice::Get().IsLearningModeEnabled())
 	{
@@ -88,7 +88,7 @@ FTangoAreaDescription TangoDeviceAreaLearning::SaveCurrentArea(FString Filename,
 		}
 		else
 		{
-			IsSuccessful = true;
+			bIsSuccessful = true;
 			//CurrentADFFile = FString(UUID); //@TODO: Update config struct in TangoDevice?
 			SavedData = FTangoAreaDescription(FString(UUID), Filename);
 		}
@@ -98,63 +98,6 @@ FTangoAreaDescription TangoDeviceAreaLearning::SaveCurrentArea(FString Filename,
 	UE_LOG(ProjectTangoPlugin, Log, TEXT("TangoDeviceAreaLearning::SaveCurrentArea: FINISHED"));
 	return SavedData;
 }
-
-void TangoDeviceAreaLearning::SaveMetaData(FString UUID, FTangoAreaDescriptionMetaData NewMetadata, bool& IsSuccessful)
-{
-	IsSuccessful = false;
-
-#if PLATFORM_ANDROID
-	TangoAreaDescriptionMetadata Metadata;
-
-	//Filename argument conversion
-	const char* NameKey = "name"; //key for filename
-	std::string ConvertedName = TCHAR_TO_UTF8(*(NewMetadata.Filename));
-	const char* NameValue = ConvertedName.c_str();
-
-	std::string ConvertedUUID = TCHAR_TO_UTF8(*UUID);
-	const char* ConvertedUUIDValue = ConvertedUUID.c_str();
-
-	const char* TransformationKey = "transformation";
-	std::string ConvertedTransformationKey = TCHAR_TO_UTF8(TransformationKey);
-
-	double TransformationElements[7] = { 0, 0, 0, 0, 0, 0, 1 };
-	//@TODO: Replace these magic numbers (8: bytes per double value, 7: number of elements in array) with constant values
-	uint TransformationArrayByteCount = (uint)(8 * 7);
-
-	//Translation
-	TransformationElements[0] = NewMetadata.TransformationX;
-	TransformationElements[1] = NewMetadata.TransformationY;
-	TransformationElements[2] = NewMetadata.TransformationZ;
-	TransformationElements[3] = NewMetadata.TransformationQX;
-	TransformationElements[4] = NewMetadata.TransformationQY;
-	TransformationElements[5] = NewMetadata.TransformationQZ;
-	TransformationElements[6] = NewMetadata.TransformationQW;
-
-	if (TangoService_getAreaDescriptionMetadata(ConvertedUUIDValue, &Metadata) != TANGO_SUCCESS)
-	{
-		UE_LOG(ProjectTangoPlugin, Error, TEXT("TangoDeviceAreaLearning::SaveMetaData: Call to get MetaData pointer from Tango was not successful, could not save metadata!"));
-		IsSuccessful = false;
-		return;
-	}
-	
-	if((TangoAreaDescriptionMetadata_set(Metadata, NameKey, (NewMetadata.Filename).Len(), NameValue) != TANGO_SUCCESS)
-		|| (TangoAreaDescriptionMetadata_set(Metadata, TransformationKey, TransformationArrayByteCount, (char*)(TransformationElements)) != TANGO_SUCCESS)
-		|| (TangoService_saveAreaDescriptionMetadata(ConvertedUUIDValue, Metadata) != TANGO_SUCCESS))
-	{
-		//Failed to save data!
-		UE_LOG(ProjectTangoPlugin, Error, TEXT("TangoDeviceAreaLearning::SaveMetaData: Calls to Tango were not successful, could not save metadata!"));
-		IsSuccessful = false;
-	}
-	else
-	{
-		IsSuccessful = true;
-		//Saved data correctly.
-		UE_LOG(ProjectTangoPlugin, Log, TEXT("TangoDeviceAreaLearning::SaveMetaData: successfully overwrote file metadata."));
-	}
-	TangoAreaDescriptionMetadata_free(Metadata);
-#endif
-}
-
 
 //END - Tango Area Learning functions
 

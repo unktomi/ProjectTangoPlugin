@@ -12,6 +12,7 @@ See the License for the specific language governing permissions and
 limitations under the License.*/
 
 #include "ProjectTangoPluginPrivatePCH.h"
+#include "TangoViewExtension.h"
 #include "TangoMotionComponent.h"
 #include "TangoImageComponent.h"
 #include "TangoDevice.h"
@@ -21,42 +22,18 @@ UTangoMotionComponent::UTangoMotionComponent() : Super()
 	LatestPoseTimeStamp = 0.0;
 	bWantsInitializeComponent = true;
 	bWantsBeginPlay = false;
-}
-
-void UTangoMotionComponent::LateUpdate()
-{
-	if (UTangoDevice::Get().getTangoDeviceMotionPointer())
-	{
-		//Only move the component if the pose status is valid.
-		FTangoPoseData LatestPose = UTangoDevice::Get().getTangoDeviceMotionPointer()->GetPoseAtTime(MotionComponentFrameOfReference, ARImage == nullptr ? 0 : ARImage->GetLatestImageTimeStamp());
-		if (LatestPose.StatusCode == ETangoPoseStatus::VALID)
-		{
-			SetRelativeLocation(LatestPose.Position);
-			SetRelativeRotation(FRotator(LatestPose.QuatRotation));
-		}
-	}
-	else
-	{
-		UE_LOG(ProjectTangoPlugin, Warning, TEXT("UTangoMotionComponent::LateUpdate: Could not update transfrom because Tango Service is not connect or has motion tracking disabled!"));
-	}
+	PrimaryComponentTick.bCanEverTick = true;
 }
 
 void UTangoMotionComponent::InitializeComponent()
 {
 	UE_LOG(ProjectTangoPlugin, Warning, TEXT("UTangoMotionComponent::InitializeComponent: Called!"));
 	Super::InitializeComponent();
-	LateUpdateHandle = UTangoDevice::Get().ViewExtension.Get().OnPreRender().AddUFunction(this, FName(TEXT("LateUpdate")));
 }
 
 void UTangoMotionComponent::BeginDestroy()
 {
 	Super::BeginDestroy();
-	UTangoDevice::Get().ViewExtension.Get().OnPreRender().Remove(LateUpdateHandle);
-}
-
-void UTangoMotionComponent::RunInARMode(bool Enable, UTangoImageComponent * ImageComponent)
-{
-	ARImage = Enable ? ImageComponent : nullptr;
 }
 
 void UTangoMotionComponent::SetupPoseEvents(TArray<FTangoCoordinateFramePair> FramePairs)
@@ -67,6 +44,12 @@ void UTangoMotionComponent::SetupPoseEvents(TArray<FTangoCoordinateFramePair> Fr
 FTangoPoseData UTangoMotionComponent::GetTangoPoseAtTime(FTangoCoordinateFramePair FrameOfReference, float Timestamp)
 {
 	return UTangoDevice::Get().getTangoDeviceMotionPointer() != nullptr ? UTangoDevice::Get().getTangoDeviceMotionPointer()->GetPoseAtTime(FrameOfReference, Timestamp) : FTangoPoseData();
+}
+
+FTransform UTangoMotionComponent::GetComponentTransformAtTime(float Timestamp)
+{
+	auto Pose = GetTangoPoseAtTime(MotionComponentFrameOfReference, Timestamp);
+	return CalcNewComponentToWorld(FTransform(Pose.QuatRotation, Pose.Position,RelativeScale3D));
 }
 
 TEnumAsByte<ETangoPoseStatus::Type> UTangoMotionComponent::GetTangoPoseStatus(float& Timestamp)
@@ -93,4 +76,55 @@ bool UTangoMotionComponent::IsLocalized()
 		UE_LOG(ProjectTangoPlugin, Warning, TEXT("UTangoAreaLearningComponent::IsLocalized: Tango Motion tracking not enabled"));
 		return false;
 	}
+}
+
+void UTangoMotionComponent::TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction *ThisTickFunction)
+{
+	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+
+	if (UTangoDevice::Get().getTangoDeviceMotionPointer())
+	{
+		FTangoPoseData LatestPose = UTangoDevice::Get().getTangoDeviceMotionPointer()->GetPoseAtTime(MotionComponentFrameOfReference, 0);
+		//Only move the component if the pose status is valid.
+		if (LatestPose.StatusCode == ETangoPoseStatus::VALID)
+		{
+			SetRelativeLocation(LatestPose.Position);
+			SetRelativeRotation(FRotator(LatestPose.QuatRotation));
+		}
+	}
+	else
+	{
+		UE_LOG(ProjectTangoPlugin, Warning, TEXT("UTangoMotionComponent::LateUpdate: Could not update transfrom because Tango Service is not connect or has motion tracking disabled!"));
+	}
+
+	if (!ViewExtension.IsValid() && GEngine)
+	{
+		TSharedPtr< FTangoViewExtension, ESPMode::ThreadSafe > NewViewExtension(new FTangoViewExtension(Cast<ITangoARInterface>(this)));
+		ViewExtension = NewViewExtension;
+		GEngine->ViewExtensions.Add(ViewExtension);
+	}
+}
+
+FTangoPoseData UTangoMotionComponent::GetCurrentPoseRENDERTHREAD(float TimeStamp)
+{
+	if (UTangoDevice::Get().getTangoDeviceMotionPointer() == nullptr)
+	{
+		return FTangoPoseData();
+	}
+	return UTangoDevice::Get().getTangoDeviceMotionPointer()->GetPoseAtTime(MotionComponentFrameOfReference, 0);
+}
+
+AActor * UTangoMotionComponent::GetActor()
+{
+	return GetOwner();
+}
+
+USceneComponent * UTangoMotionComponent::AsSceneComponent()
+{
+	return Cast<USceneComponent>(this);
+}
+
+FTransform UTangoMotionComponent::CalcComponentToWorld(FTransform transform)
+{
+	return CalcNewComponentToWorld(transform);
 }

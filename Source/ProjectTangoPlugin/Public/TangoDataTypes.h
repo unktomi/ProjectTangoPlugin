@@ -200,7 +200,7 @@ namespace ETangoEventKeyType
 USTRUCT(BlueprintType)
 struct PROJECTTANGOPLUGIN_API FTangoEvent
 {
-	GENERATED_BODY()
+	GENERATED_USTRUCT_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tango", meta = (ToolTip = "Tango event type"))
 		TEnumAsByte<ETangoEventKeyType::Type> Key;
@@ -257,7 +257,7 @@ struct PROJECTTANGOPLUGIN_API FTangoCoordinateFramePair
 USTRUCT(BlueprintType)
 struct PROJECTTANGOPLUGIN_API FTangoAreaDescription
 {
-	GENERATED_BODY()
+	GENERATED_USTRUCT_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tango", meta = (ToolTip = "Unique identifier of the ADF file"))
 		FString UUID;
@@ -265,9 +265,8 @@ struct PROJECTTANGOPLUGIN_API FTangoAreaDescription
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tango", meta = (ToolTip = "Filename of the area description file"))
 		FString Filename;
 
-	FTangoAreaDescription();
-
 	FTangoAreaDescription(const FString InUUID, const FString InFileName);
+	FTangoAreaDescription() {};
 
 	void SetUUID(const FString NewValue);
 
@@ -282,18 +281,16 @@ Used by developers to set their desired configuration for the Tango service at r
 USTRUCT(BlueprintType)
 struct PROJECTTANGOPLUGIN_API FTangoRuntimeConfig
 {
-	GENERATED_BODY()
+	GENERATED_USTRUCT_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tango", meta = (ToolTip = "Should the devices colour camera be enabled"))
-		bool EnableColorCamera;
+		bool bEnableColorCamera;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tango", meta = (ToolTip = "Should the devices depth sensor be enabled"))
-		bool EnableDepth;
+		bool bEnableDepth;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tango", meta = (ToolTip = "The frame rate of the depth sensor"))
 		int32 RuntimeDepthFramerate;
-
-	FTangoRuntimeConfig();
 };
 
 /*
@@ -304,34 +301,34 @@ struct PROJECTTANGOPLUGIN_API FTangoRuntimeConfig
 USTRUCT(BlueprintType)
 struct PROJECTTANGOPLUGIN_API FTangoConfig
 {
-	GENERATED_BODY()
+	GENERATED_USTRUCT_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tango")
-		bool EnableAutoRecovery;
+		bool bEnableAutoRecovery;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tango", meta = (ToolTip = "Allow for activation of color camera"))
-		bool EnableColorCameraCapabilities;
+		bool bEnableColorCameraCapabilities;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tango", meta = (ToolTip = "Automatically adjust ISO and Exposure"))
-		bool ColorModeAuto;
+		bool bColorModeAuto;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tango", meta = (ToolTip = "Allow for activation of depth camera"))
-		bool EnableDepthCapabilities;
+		bool bEnableDepthCapabilities;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tango", meta = (ToolTip = "Wether the pose should be tracked in high frequency mode"))
-		bool HighRatePose;
+		bool bHighRatePose;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tango", meta = (ToolTip = "Wether ADF learning capabilities should be enabled"))
-		bool EnableLearningMode;
+		bool bEnableLearningMode;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tango", meta = (ToolTip = "Should low latency IMU be activated"))
-		bool LowLatencyIMUIntegration;
+		bool bLowLatencyIMUIntegration;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tango", meta = (ToolTip = "Wether motion tracking should be activated"))
-		bool EnableMotionTracking;
+		bool bEnableMotionTracking;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tango", meta = (ToolTip = "Wether the pose should be smoothed. Can result in a little bit of lag and inaccuracies"))
-		bool SmoothPose;
+		bool bSmoothPose;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tango", meta = (ToolTip = "Sets exposure of the color camera"))
 		int32 ColorExposure;
@@ -339,20 +336,11 @@ struct PROJECTTANGOPLUGIN_API FTangoConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tango", meta = (ToolTip = "Sets ISO value of color camera"))
 		int32 ColorISO;
 
-	/* This struct will be used for setting only. So the getter parameters are not needed
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tango")
-		int32 MaxPointCloudElements;
-		
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tango")
-		float DepthPeriodInSeconds;*/
-
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tango", meta = (ToolTip = "Determines which area description file should be loaded"))
 		FTangoAreaDescription AreaDescription;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tango", meta = (ToolTip = "The scaling factor from Tango coordinates (meters) to Unreal coordiantes"))
 		float MetersToWorldScale = 100.0f;
-
-	FTangoConfig();
 };
 
 /*
@@ -363,7 +351,7 @@ struct PROJECTTANGOPLUGIN_API FTangoConfig
 USTRUCT(BlueprintType)
 struct PROJECTTANGOPLUGIN_API FTangoPoseData
 {
-	GENERATED_BODY()
+	GENERATED_USTRUCT_BODY()
 	//@NOTE: Accuracy will be supported in a future update of the Tango API
 	//UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tango")
 	//	float Accuracy;
@@ -387,52 +375,13 @@ struct PROJECTTANGOPLUGIN_API FTangoPoseData
 		FTangoCoordinateFramePair FrameOfReference;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tango", meta = (ToolTip = "Status code of this pose"))
-		TEnumAsByte<ETangoPoseStatus::Type> StatusCode;
+		TEnumAsByte<ETangoPoseStatus::Type> StatusCode = ETangoPoseStatus::UNKNOWN;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tango", meta = (ToolTip = "Pose time in seconds since the device was started"))
 		float Timestamp;
 
-
-	FTangoPoseData();
-
-	FTangoPoseData(FVector NewPosition, FRotator NewRotation, FQuat NewQuatRotation, FTangoCoordinateFramePair NewFrameOfReference,
-		TEnumAsByte<ETangoPoseStatus::Type> NewStatusCode, float NewTimestamp);
-};
-
-/*
-	FTangoXyzIjData
-*/
-//@TODO: Investigate if we should remove that
-USTRUCT(BlueprintType)
-struct PROJECTTANGOPLUGIN_API FTangoXYZijData
-{
-	GENERATED_BODY()
-
-	//@NOTE: These properties are currently not supported in the current versions
-	// of Google Tango, and will be available in a later release.
-	/*
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tango")
-		TArray<int32> ij;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tango")
-		int32 ijCols;
-	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tango")
-		int32 ijRows;
-	*/
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tango", meta = (ToolTip = "XYZij receive time in seconds since the device was started"))
-		float timestamp;
-
-	//@NOTE: We are removing the xyz component from the Blueprint API in order to prevent mismanagement of device thermals,
-	//and remove any potential deep copy of the point cloud array.
-	//UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tango")
-		//TArray<FVector> xyz;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tango", meta = (ToolTip = "Number of points in the point cloud"))
-		int32 count;
-
-	FTangoXYZijData();
-
+	FTangoPoseData(FVector NewPosition = FVector(), FRotator NewRotation = FRotator(), FQuat NewQuatRotation = FQuat(), FTangoCoordinateFramePair NewFrameOfReference = FTangoCoordinateFramePair(),
+		TEnumAsByte<ETangoPoseStatus::Type> NewStatusCode = ETangoPoseStatus::UNKNOWN, float NewTimestamp = 0.0f);
 };
 
 /*
@@ -442,7 +391,7 @@ struct PROJECTTANGOPLUGIN_API FTangoXYZijData
 USTRUCT(BlueprintType)
 struct PROJECTTANGOPLUGIN_API FTangoCameraIntrinsics
 {
-	GENERATED_BODY()
+	GENERATED_USTRUCT_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tango", meta = (ToolTip = "Calibration type of the camera"))
 		TEnumAsByte<ETangoCalibrationType::Type> CalibrationType;
@@ -470,11 +419,6 @@ struct PROJECTTANGOPLUGIN_API FTangoCameraIntrinsics
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tango", meta = (ToolTip = "Height in pixels"))
 		int32 Height;
-
-	FTangoCameraIntrinsics();
-	
-	~FTangoCameraIntrinsics();
-
 };
 
 
@@ -484,7 +428,7 @@ struct PROJECTTANGOPLUGIN_API FTangoCameraIntrinsics
 USTRUCT(BlueprintType)
 struct PROJECTTANGOPLUGIN_API FTangoAreaDescriptionMetaData
 {
-	GENERATED_BODY()
+	GENERATED_USTRUCT_BODY()
 		
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tango", meta = (ToolTip = "File name of the ADF file"))
 		FString Filename;
@@ -507,8 +451,6 @@ struct PROJECTTANGOPLUGIN_API FTangoAreaDescriptionMetaData
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tango", meta = (ToolTip = "Information where on the world the ADF was created"))
 		float TransformationQW;
 
-	FTangoAreaDescriptionMetaData();
-
 	FTangoAreaDescriptionMetaData(const FString InFileName, const int32 InMillisecondsSinceUnixEpoch, const FTransform InTransformation);
-
+	FTangoAreaDescriptionMetaData() {};
 };

@@ -2,14 +2,15 @@
 	"PluginFileVersion" : 3,
 
 	"FriendlyName" : "Project Tango Plugin",
-	"Version" : 0.8,
-	"VersionName" : "0.8.1",
-	"CreatedBy" : "Opaque Media Group",
-	"CreatedByURL" : "www.opaque.media",
+	"Version" : 1,
+	"VersionName" : "0.9.5",
+	"CreatedBy" : "Opaque Multimedia",
+	"CreatedByURL" : "www.opaquemultimedia.com",
 	"Description" : "Project Tango Plugin enables the use of Project Tango devices and sensors with Unreal 4",
-	"Category" : "Google",
-	"EnabledByDefault" : "false",
+	"Category" : "Augmented Reality",
+	"EnabledByDefault" : false,
 	"IsBetaVersion": true,
+	"CanContainContent": true,
 	"Modules" :
 	[
 		{

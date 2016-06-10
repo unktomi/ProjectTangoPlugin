@@ -35,7 +35,7 @@ limitations under the License.
 		<addElement tag="application" name="bTangoAreaLearningEnabledElement" />
 
     <setElement result="bRequiresProjectTangoLibraryElement" value="uses-library"/>
-    <addAttribute tag="$bRequiresProjectTangoLibraryElement" name="android:name" value="com.projecttango.libtango_device"/>
+    <addAttribute tag="$bRequiresProjectTangoLibraryElement" name="android:name" value="com.projecttango.libtango_device2"/>
     <addAttribute tag="$bRequiresProjectTangoLibraryElement" name="android:required" value="true"/>
     
     <addElement tag="application" name="bRequiresProjectTangoLibraryElement" />
@@ -66,6 +66,7 @@ limitations under the License.
 		<insert>
 			
 			import com.projecttango.plugin.ProjectTangoInterface;
+            import android.util.Log;
 			
 		</insert>
 	</gameActivityImportAdditions>
@@ -79,12 +80,29 @@ limitations under the License.
       private ProjectTangoInterface tangoInterface;
 
       //Thunking functions
-      // Arbitrary function to test the Android Thunking layer
-      public int AndroidThunkJava_GetArbitraryInt()
+      public Context AndroidThunkJava_GetAppContext()
       {
-        return 42;
+        return this.getApplicationContext();
       }
 
+      public void AndroidThunkJava_RequestTangoService()
+      {
+        if(tangoInterface != null)
+        {
+            tangoInterface.RequestTangoService(this);
+        }
+        return;
+      }
+      
+      public void AndroidThunkJava_UnbindTangoService()
+      {
+        if(tangoInterface != null)
+        {
+            tangoInterface.UnbindTangoService(this);
+        }
+        return;
+      }
+      
       public void AndroidThunkJava_RequestImportPermission(String Filename)
       {
         if(tangoInterface != null)
@@ -109,19 +127,19 @@ limitations under the License.
 	<gameActivityReadMetadataAdditions>
 		<insert>
 			
-			boolean IsTangoAreaLearningEnabled = false;
+			boolean bIsTangoAreaLearningEnabled = false;
     
 			//Is the Area Learning Intent Enabled.
 
 			if (bundle.containsKey("com.projecttango.bTangoAreaLearningEnabled"))
 			{
-				IsTangoAreaLearningEnabled = bundle.getBoolean("com.projecttango.bTangoAreaLearningEnabled");
-				Log.debug( "Found bTangoAreaLearningEnabled = " + IsTangoAreaLearningEnabled);
+				bIsTangoAreaLearningEnabled = bundle.getBoolean("com.projecttango.bTangoAreaLearningEnabled");
+				Log.debug( "Found bTangoAreaLearningEnabled = " + bIsTangoAreaLearningEnabled);
 			}
 			
       //We want an interface even if there are no special permissions requested as Tango motion no longer requires permissions
       
-				tangoInterface = new ProjectTangoInterface(IsTangoAreaLearningEnabled);
+				tangoInterface = new ProjectTangoInterface(bIsTangoAreaLearningEnabled);
 			
 		</insert>
 	</gameActivityReadMetadataAdditions>
@@ -161,10 +179,99 @@ limitations under the License.
 		</insert>
 	</gameActivityOnActivityResultAdditions>
 	
+    <!-- @NOTE: We have disabled this as there is now library loading code in the static braces of ProjectTangoInterface -->
 	<!-- Tell the Java implementation to load the Tango API library on the device 
 		before we start executing the GameActivity. -->
-	<soLoadLibrary>
-		<log text="ProjectTangoPlugin Plugin Native Library load addition."/>
-		<loadLibrary name="libtango_client_api" failmsg="Tango Client API library failed to load when it is required to run the application." />
-	</soLoadLibrary>
+    <soLoadLibrary>
+        <insert>
+            //Begin dynamic load attempt of the Tango library.
+            
+            final int ARCH_ERROR = -2;
+            final int ARCH_FALLBACK = -1;
+            final int ARCH_DEFAULT = 0;
+            final int ARCH_ARM64 = 1;
+            final int ARCH_ARM32 = 2;
+            final int ARCH_X86_64 = 3;
+            final int ARCH_X86 = 4;
+            
+            Log.debug("TangoVMTests: Shim Static class called.");
+            
+            Log.debug("TangoLifecycleDebugging: Now attempting to load the shared library.");
+            int loadedSoId = ARCH_ERROR;
+            String basePath = "/data/data/com.google.tango/libfiles/";
+            if (!(new File(basePath).exists())) {
+            basePath = "/data/data/com.projecttango.tango/libfiles/";
+            }
+            Log.debug("TangoInitializationHelper: basePath: " + basePath);
+            
+            try {
+            System.load(basePath + "arm64-v8a/libtango_client_api.so");
+            loadedSoId = ARCH_ARM64;
+            Log.debug("TangoInitializationHelper: Success! Using arm64-v8a/libtango_client_api.");
+            } catch (UnsatisfiedLinkError e) {
+            }
+            //Note: &lt; = lessthan operator
+            if (loadedSoId &lt; ARCH_DEFAULT) {
+            try {
+            System.load(basePath + "armeabi-v7a/libtango_client_api.so");
+            loadedSoId = ARCH_ARM32;
+            Log.debug("TangoInitializationHelper: Success! Using armeabi-v7a/libtango_client_api.");
+            } catch (UnsatisfiedLinkError e) {
+            }
+            }
+            if (loadedSoId &lt; ARCH_DEFAULT) {
+            try {
+            System.load(basePath + "x86_64/libtango_client_api.so");
+            loadedSoId = ARCH_X86_64;
+            Log.debug("TangoInitializationHelper: Success! Using x86_64/libtango_client_api.");
+            } catch (UnsatisfiedLinkError e) {
+            }
+            }
+            if (loadedSoId &lt; ARCH_DEFAULT) {
+            try {
+            System.load(basePath + "x86/libtango_client_api.so");
+            loadedSoId = ARCH_X86;
+            Log.debug("TangoInitializationHelper: Success! Using x86/libtango_client_api.");
+            } catch (UnsatisfiedLinkError e) {
+            }
+            }
+            if (loadedSoId &lt; ARCH_DEFAULT) {
+            try {
+            System.load(basePath + "default/libtango_client_api.so");
+            loadedSoId = ARCH_DEFAULT;
+            Log.debug("TangoInitializationHelper: Success! Using default/libtango_client_api.");
+            } catch (UnsatisfiedLinkError e) {
+            }
+            }
+            if (loadedSoId &lt; ARCH_DEFAULT) {
+            try {
+            System.loadLibrary("tango_client_api");
+            loadedSoId = ARCH_FALLBACK;
+            Log.debug("Falling back to libtango_client_api.so symlink.");
+            } catch (UnsatisfiedLinkError e) {
+            }
+            }
+            
+            //Begin evaluation of library loading routine result here
+            
+            //@NOTE: This code borrowed from TangoJNINative.java in the HelloMotion c example code
+            // This project depends on tango_client_api, so we need to make sure we load
+            // the correct library first.
+            int LibraryLoadResult = loadedSoId;
+            if (LibraryLoadResult == ARCH_ERROR)
+            {
+            Log.debug("TangoLifecycleDebugging: ERROR! Unable to load libtango_client_api.so!");
+            }
+            else
+            {
+            Log.debug("TangoLifecycleDebugging: Success! Able to load libtango_client_api.so!");
+            }
+            
+            if(LibraryLoadResult == ARCH_FALLBACK)
+            {
+            Log.debug("TangoLifecycleDebugging: NOTE: Unable to load libtango_client_api.so from new source. Fell back to the Symlink version. Will not work outside a Yellowstone tablet!");
+            }
+            
+        </insert>
+    </soLoadLibrary>
 </root>

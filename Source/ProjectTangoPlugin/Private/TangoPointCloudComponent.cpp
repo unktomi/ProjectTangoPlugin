@@ -17,7 +17,6 @@ limitations under the License.*/
 
 UTangoPointCloudComponent::UTangoPointCloudComponent(const class FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
-	PrimaryComponentTick.bCanEverTick = true;
 	bWantsBeginPlay = true;
 }
 UTangoPointCloudComponent::~UTangoPointCloudComponent()
@@ -26,9 +25,9 @@ UTangoPointCloudComponent::~UTangoPointCloudComponent()
 
 void UTangoPointCloudComponent::BeginPlay()
 {
+	UTangoDevice::Get().PointCloudComponents.Add(this);
 	Super::BeginPlay();
 	InternalPointCloudContainer = NewObject<UPointCloudContainer>(this, TEXT("PointCloudContainer"));
-	//UTangoDevice::Get().ConnectPointCloudCallback(); //@TODO: Do we need to do something here? (Manual Lifecycle)
 	LatestDepthTimeStamp = 0.0;
 
 }
@@ -36,34 +35,6 @@ void UTangoPointCloudComponent::BeginPlay()
 float UTangoPointCloudComponent::GetCurrentWorldScaleFactor()
 {
 	return UTangoDevice::Get().GetMetersToWorldScale();
-}
-
-void UTangoPointCloudComponent::TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction * ThisTickFunction)
-{
-	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-
-	//Detect if an event should be fired, and if so fire it
-	CheckForDepthEvents();
-}
-
-void UTangoPointCloudComponent::CheckForDepthEvents()
-{
-	if (UTangoDevice::Get().getTangoDevicePointCloudPointer() == nullptr)
-	{
-		return;
-	}
-
-	float LatestDeviceDepthTimeStamp = UTangoDevice::Get().getTangoDevicePointCloudPointer()->GetPointCloudTimestamp();
-
-	//Check against the latest Timestamp and see if there is an event to fire
-	if (LatestDepthTimeStamp < LatestDeviceDepthTimeStamp)
-	{
-		//Set this timestamp to be the latest timestamp used
-		LatestDepthTimeStamp = LatestDeviceDepthTimeStamp;
-
-		//@TODO: Introduce a function which returns the latest depth cloud from the TangoDevice
-		OnTangoXYZijAvailable.Broadcast(UTangoDevice::Get().getTangoDevicePointCloudPointer()->GetLatestXYZijData());
-	}
 }
 
 int32 UTangoPointCloudComponent::GetMaxPointCount()
@@ -78,19 +49,19 @@ int32 UTangoPointCloudComponent::GetMaxPointCount()
 	}
 }
 
-FVector UTangoPointCloudComponent::GetSinglePoint(int32 Index, float & Timestamp, bool& ValidValue)
+FVector UTangoPointCloudComponent::GetSinglePoint(int32 Index, float & Timestamp, bool& bIsValidValue)
 {
 	if (UTangoDevice::Get().getTangoDevicePointCloudPointer() != nullptr)
 	{
 		TArray<FVector>& PCloud = UTangoDevice::Get().getTangoDevicePointCloudPointer()->GetPointCloud();
-		ValidValue = PCloud.Num() > Index && Index >= 0;
+		bIsValidValue = PCloud.Num() > Index && Index >= 0;
 		Timestamp = UTangoDevice::Get().getTangoDevicePointCloudPointer() != nullptr ? UTangoDevice::Get().getTangoDevicePointCloudPointer()->GetPointCloudTimestamp() : 0;
-		return ValidValue ? PCloud[Index] : FVector();
+		return bIsValidValue ? PCloud[Index] : FVector();
 	}
 	else
 	{
 		Timestamp = 0;
-		ValidValue = false;
+		bIsValidValue = false;
 		return FVector();
 	}
 }
@@ -101,29 +72,22 @@ int32 UTangoPointCloudComponent::GetCurrentPointCount(float & Timestamp)
 	return UTangoDevice::Get().getTangoDevicePointCloudPointer() != nullptr ? UTangoDevice::Get().getTangoDevicePointCloudPointer()->GetPointCloud().Num() : 0;
 }
 
-FVector UTangoPointCloudComponent::FindClosestDepthPoint(FVector2D ScreenPoint, float& Timestamp, float MaxDistanceFromPoint)
+bool UTangoPointCloudComponent::FindClosestDepthPoint(UCameraComponent* ViewPoint, FVector2D ScreenPoint, FVector& Result, float& Timestamp, float MaxDistanceFromPoint)
 {
 	if (UTangoDevice::Get().getTangoDevicePointCloudPointer() == nullptr)
 	{
 		UE_LOG(ProjectTangoPlugin, Error, TEXT("UTangoPointCloudComponent::FindClosestDepthPoint: Could not execute since depth is not activated in tangoconfig!"));
-		return FVector();
+		return false;
 	}
-	UWorld* World = GetWorld();
-	ULocalPlayer* LocalPlayer = GEngine->GetLocalPlayerFromControllerId(World, 0);
 
 	int32 BestIndex = -1;
 	float BestDistanceSquared = 0;
 	Timestamp = UTangoDevice::Get().getTangoDevicePointCloudPointer()->GetPointCloudTimestamp();
 	TArray<FVector>& PointCloud = UTangoDevice::Get().getTangoDevicePointCloudPointer()->GetPointCloud();
-	FVector OutViewLocation;
-	FRotator OutViewRotation;
-
-	FSceneViewFamilyContext ViewFamily(FSceneViewFamily::ConstructionValues(LocalPlayer->ViewportClient->Viewport, World->Scene, LocalPlayer->ViewportClient->EngineShowFlags).SetRealtimeUpdate(true));
-	static FSceneView* SceneView = LocalPlayer->CalcSceneView(&ViewFamily, OutViewLocation, OutViewRotation, LocalPlayer->ViewportClient->Viewport);
 
 	for (int32 i = 0; i < PointCloud.Num(); ++i)
 	{
-		FVector2D ScreenPos = ProjectVectorToScreen(PointCloud[i], SceneView);
+		FVector2D ScreenPos = ProjectVectorToScreen(ViewPoint,PointCloud[i]);
 		float DistanceSquared = FVector2D::DistSquared(ScreenPos, ScreenPoint);
 
 		if (DistanceSquared > MaxDistanceFromPoint * MaxDistanceFromPoint)
@@ -137,31 +101,27 @@ FVector UTangoPointCloudComponent::FindClosestDepthPoint(FVector2D ScreenPoint, 
 		}
 	}
 
-	return (BestIndex == -1) ? FVector::ZeroVector : PointCloud[BestIndex];
+	if (BestIndex >= 0)
+	{
+		Result = PointCloud[BestIndex];
+	}
+	return BestIndex != -1;
 }
 
-
-TArray<FVector> UTangoPointCloudComponent::GetAllDepthPointsInArea(FVector2D ScreenPoint, float Range, float& Timestamp)
+TArray<FVector> UTangoPointCloudComponent::GetAllDepthPointsInArea(UCameraComponent* ViewPoint, FVector2D ScreenPoint, float Range, float& Timestamp)
 {
 	if (UTangoDevice::Get().getTangoDevicePointCloudPointer() == nullptr)
 	{
 		UE_LOG(ProjectTangoPlugin, Error, TEXT("UTangoPointCloudComponent::GetAllDepthPointsInArea: Could not execute since depth is not activated in tangoconfig!"));
 		return TArray<FVector>();
 	}
-	UWorld* World = GetWorld();
-	ULocalPlayer* LocalPlayer = GEngine->GetLocalPlayerFromControllerId(World, 0);
 	auto DepthPoints = TArray<FVector>();
-	FVector OutViewLocation;
-	FRotator OutViewRotation;
-
-	FSceneViewFamilyContext ViewFamily(FSceneViewFamily::ConstructionValues(LocalPlayer->ViewportClient->Viewport, World->Scene, LocalPlayer->ViewportClient->EngineShowFlags).SetRealtimeUpdate(true));
-	static FSceneView* SceneView = LocalPlayer->CalcSceneView(&ViewFamily, OutViewLocation, OutViewRotation, LocalPlayer->ViewportClient->Viewport);
 
 	Timestamp = UTangoDevice::Get().getTangoDevicePointCloudPointer()->GetPointCloudTimestamp();
 	TArray<FVector>& PointCloud = UTangoDevice::Get().getTangoDevicePointCloudPointer()->GetPointCloud();
 	for (int32 i = 0; i < PointCloud.Num(); ++i)
 	{
-		FVector2D ScreenPos = ProjectVectorToScreen(PointCloud[i], SceneView);
+		FVector2D ScreenPos = ProjectVectorToScreen(ViewPoint, PointCloud[i]);
 
 		if (FVector2D::DistSquared(ScreenPos, ScreenPoint) < Range * Range)
 		{
@@ -172,28 +132,15 @@ TArray<FVector> UTangoPointCloudComponent::GetAllDepthPointsInArea(FVector2D Scr
 	return DepthPoints;
 }
 
-/*
-TODO: Review why this function appears to work with some odd input parameters.
-OBSERVE: With input parameters - Point Area Radius = 60, Min Percentage = 1, PointDistanceThreshold = 2
-
-NOTE: The main point of interest is that the min percentage cannot be raised much higher which means that
-any plane generated with RANSAC approach does not seem to include many of the closest points to the
-screen point and its area radius
-*/
-bool UTangoPointCloudComponent::GetPlaneAtScreenCoordinates(FVector2D ScreenPoint, float PointAreaRadius, float MinPercentage, float PointDistanceThreshold, FVector& PlaneCenter, FPlane& Plane, float& Timestamp)
+bool UTangoPointCloudComponent::GetPlaneAtScreenCoordinates(UCameraComponent* ViewPoint, FVector2D ScreenPoint, float PointAreaRadius, float MinPercentage, float PointDistanceThreshold, FVector& PlaneCenter, FPlane& Plane, float& Timestamp)
 {
 	UWorld* World = GetWorld();
 	ULocalPlayer* LocalPlayer = GEngine->GetLocalPlayerFromControllerId(World, 0);
 
 	//@TODO: This is very bad!
-	TArray<FVector> ClosestPoints = GetAllDepthPointsInArea(ScreenPoint, PointAreaRadius, Timestamp);
+	TArray<FVector> ClosestPoints = GetAllDepthPointsInArea(ViewPoint, ScreenPoint, PointAreaRadius, Timestamp);
 	PlaneCenter = GetVectorArrayAverage(ClosestPoints);
 
-	static FVector Location;
-	static FRotator Rotation;
-	UGameplayStatics::GetPlayerController(World, 0)->GetPlayerViewPoint(Location, Rotation);
-
-	FVector ForwardVector = Rotation.Vector();
 	Plane = FPlane();
 
 	if (ClosestPoints.Num() < 3)
@@ -205,8 +152,8 @@ bool UTangoPointCloudComponent::GetPlaneAtScreenCoordinates(FVector2D ScreenPoin
 	int MaxIterations = 50;
 
 	//Threshold to define if a point belongs to a plane or not
-	//Distance in meters from point to plane
-	double Threshold = PointDistanceThreshold * World->GetWorldSettings()->WorldToMeters;
+	//Distance in UE units from point to plane
+	double Threshold = PointDistanceThreshold;
 
 	int MaxFittedPoints = 0;
 	double PercentageFitted = 0;
@@ -215,7 +162,7 @@ bool UTangoPointCloudComponent::GetPlaneAtScreenCoordinates(FVector2D ScreenPoin
 	//RANSAC algorithm to determine inliers
 	for (int i = 0; i < MaxIterations; i++)
 	{
-		FPlane CandidatePlane = MakeRandomPlane(ForwardVector, ClosestPoints);
+		FPlane CandidatePlane = MakeRandomPlane(FVector::ForwardVector, ClosestPoints);
 		FittedPointsCount = 0;
 
 		//See for every point if it belongs to that Plane or not
@@ -301,25 +248,21 @@ FPlane UTangoPointCloudComponent::MakeRandomPlane(FVector CameraForward, TArray<
 	return Plane;
 }
 
-FVector2D UTangoPointCloudComponent::ProjectVectorToScreen(FVector Location, FSceneView* SceneView)
+FVector2D UTangoPointCloudComponent::ProjectVectorToScreen(UCameraComponent* ViewPoint, FVector Location)
 {
 
-	ULocalPlayer* LocalPlayer = GEngine->GetLocalPlayerFromControllerId(World, 0);
-
-	FPlane V(0, 0, 0, 0);
-	if (SceneView != NULL)
-	{
-		Location.DiagnosticCheckNaN();
-		V = SceneView->Project(Location);
-	}
-
 	static FVector2D ScreenDimensions;
-	LocalPlayer->ViewportClient->GetViewportSize(ScreenDimensions);
+	GEngine->GetLocalPlayerFromControllerId(GWorld, 0)->ViewportClient->GetViewportSize(ScreenDimensions);//@TODO: POSSIBLY WRONG ASSUMPTION: ID = 0
 
-	FVector ReturnValue(V);
-	ReturnValue.X = (ScreenDimensions.X / 2.f) + (ReturnValue.X * (ScreenDimensions.X / 2.f));
-	ReturnValue.Y *= -1.f * GProjectionSignY;
-	ReturnValue.Y = (ScreenDimensions.Y / 2.f) + (ReturnValue.Y * (ScreenDimensions.Y / 2.f));
+	float wU = FMath::Tan(FMath::DegreesToRadians<float>(ViewPoint->FieldOfView*0.5f)) * Location.X;
+	float wV = FMath::Tan(FMath::DegreesToRadians<float>(ViewPoint->FieldOfView*0.5f / ViewPoint->AspectRatio)) * Location.X;
+
+	float U =  Location.Y / wU;
+	float V = -Location.Z / wV;
+
+	FVector ReturnValue;
+	ReturnValue.X = (ScreenDimensions.X / 2.f) + (U * (ScreenDimensions.X / 2.f));
+	ReturnValue.Y = (ScreenDimensions.Y / 2.f) + (V * (ScreenDimensions.Y / 2.f));
 
 	return FVector2D(ReturnValue);
 }

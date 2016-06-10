@@ -25,11 +25,23 @@ public:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, meta = (ToolTip = "The current timestamp of points component"))
 		float Timestamp;
 
-	UPROPERTY(Category = "Point Rendering", EditAnywhere, BlueprintReadWrite, meta = (ToolTip = "Material used to color the points"))
-		UMaterialInterface * Material;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ToolTip = "Activate experimetnal mesh creation."))
+		bool bExperimentalMeshGeneration = false;
 
 public:
 	UTangoPointsComponent();
+
+	/*
+	*	Prepares a Material for coloring Tango depth points with the Color Camera textures.
+	* @param Target The Unreal Engine / Tango Image interface object.
+	* @param Instance The Material Instance that should be updated.
+	* @param PackedYMaskTextureName The name of the Material Texture Parameter of the YTexture.
+	* @param PackedUVMaskTextureName The name of the Material Texture Parameter of the UVTexture.
+	* @param MaterialVectorName The name of the Material Parameter for the Camera view width in Pixels and UV offsets.
+	* @param MatrixVectorName Thhe name of the Material Parameter for the UV projection matrix.
+	*/
+	UFUNCTION(Category = "Tango|Depth", BlueprintCallable, meta = (ToolTip = "Prepares a material for coloring the Tango point mesh.", keyword = "image, camera, view, texture, pointcloud, depth"))
+		bool PrepareMaterialForPointColoring(UTangoImageComponent* ImageComponent, UMaterial* Material, FName PackedYMaskTextureName = FName("PackedYMaskTexture"), FName PackedUVMaskTextureName = FName("PackedUVMaskTexture"), FName MaterialVectorName = FName("CameraMaterialVector"), FName IntrinsicsName = FName("Intrinsics"), FName DistortionName = FName("Distortion"));
 
 	//UActorComponent interface
 	virtual void TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction *ThisTickFunction) override;
@@ -38,6 +50,9 @@ public:
 	virtual FPrimitiveSceneProxy* CreateSceneProxy() override;
 	virtual FBoxSphereBounds CalcBounds(const FTransform& LocalToWorld) const override;
 	// End UPrimitiveComponent interface.
+private:
+	FVector MinBounds;
+	FVector MaxBounds;
 };
 
 /** This class is the container inside the renderer that holds onto our array of vertices. */
@@ -128,12 +143,15 @@ public:
 		check(IsInRenderingThread());
 
 		// Initialize the vertex factory's stream components.
-		DataType NewData;
+		FDataType NewData;
+		auto UVs = TArray<FVertexStreamComponent>();
 		NewData.PositionComponent = STRUCTMEMBER_VERTEXSTREAMCOMPONENT(VertexBuffer, FDynamicMeshVertex, Position, VET_Float3);
 		NewData.ColorComponent = STRUCTMEMBER_VERTEXSTREAMCOMPONENT(VertexBuffer, FDynamicMeshVertex, Color, VET_Color);
+		UVs.Add(STRUCTMEMBER_VERTEXSTREAMCOMPONENT(VertexBuffer, FDynamicMeshVertex, TextureCoordinate, VET_Float2));
+		NewData.TextureCoordinates = UVs;
+		NewData.TangentBasisComponents[0] = STRUCTMEMBER_VERTEXSTREAMCOMPONENT(VertexBuffer, FDynamicMeshVertex, TangentX, VET_PackedNormal);
+		NewData.TangentBasisComponents[1] = STRUCTMEMBER_VERTEXSTREAMCOMPONENT(VertexBuffer, FDynamicMeshVertex, TangentZ, VET_PackedNormal);
 		SetData(NewData);
-
-
 	}
 
 	/** Init function that can be called on any thread, and will do the right thing (enqueue command if called on main thread) */
@@ -170,17 +188,18 @@ public:
 	FLinearColor Color;
 	float PointSize;
 	uint8 DepthPriority;
+	bool bTriangles;
 
 public:
 
-	FTangoPointCloudSceneProxy(const UTangoPointsComponent* InComponent);
+	FTangoPointCloudSceneProxy(const UTangoPointsComponent* InComponent, FVector& MinBounds,FVector& MaxBounds,const FMatrix& ProjMat,const bool bCreateTriangles = false);
 	virtual ~FTangoPointCloudSceneProxy();
 
 	void UpdatePoints_RenderThread();
 
 	virtual void GetDynamicMeshElements(const TArray<const FSceneView*>& Views, const FSceneViewFamily& ViewFamily, uint32 VisibilityMap, FMeshElementCollector& Collector) const override;
 
-	virtual FPrimitiveViewRelevance GetViewRelevance(const FSceneView* View) override
+	virtual FPrimitiveViewRelevance GetViewRelevance(const FSceneView* View) const override
 	{
 		return ViewRelevance;
 	}

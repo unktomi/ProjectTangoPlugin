@@ -18,26 +18,6 @@ limitations under the License.*/
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnTangoImageAvailable, float, Timestamp);
 
-USTRUCT()
-struct FInitMaterialListEntry
-{
-	GENERATED_BODY()
-
-	UPROPERTY()
-		UMaterialInstanceDynamic* Instance;
-	FName PackedYMaskTextureName;
-	FName PackedUVMaskTextureName;
-	FName MaterialVectorName;
-
-	FInitMaterialListEntry(UMaterialInstanceDynamic* _Instance, FName _PackedYMaskTextureName, FName _PackedUVMaskTextureName, FName _MaterialVectorName)
-		: Instance(_Instance), PackedYMaskTextureName(_PackedYMaskTextureName), PackedUVMaskTextureName(_PackedUVMaskTextureName), MaterialVectorName(_MaterialVectorName)
-	{
-	}
-
-	FInitMaterialListEntry() {}
-};
-
-
 UCLASS(ClassGroup = Tango, Blueprintable, meta = (BlueprintSpawnableComponent))
 class PROJECTTANGOPLUGIN_API UTangoImageComponent : public UActorComponent
 {
@@ -58,7 +38,7 @@ public:
 	* @return The time (in seconds since the Tango service was started) when the latest Image pose was retrieved.
 	*/
 	UFUNCTION(Category = "Tango|Camera", BlueprintPure, meta = (ToolTip = "Get camera Y texture view. Also returns a Timestamp of when the image was captured and whether the result image is valid.", keyword = "image, camera, view, texture"))
-		UTexture* GetCameraViewYTexture(float& Timestamp, bool& IsValid);
+		UTexture* GetCameraViewYTexture(float& Timestamp, bool& bIsValid);
 
 	/*
 	*	Get UV component of camera texture view. Also returns a timestamp of when the image was captured and whether the result image is valid.
@@ -68,20 +48,7 @@ public:
 	* @return Returns a texture reference of what the camera is currently seeing.
 	*/
 	UFUNCTION(Category = "Tango|Camera", BlueprintPure, meta = (ToolTip = "Get camera UV texture view. Also returns a Timestamp of when the image was captured and whether the result image is valid.", keyword = "image, camera, view, texture"))
-		UTexture* GetCameraViewUVTexture(float& Timestamp, bool& IsValid);
-
-	/*
-	*	Prepares a Material for displaying the Color Camera view. Useful for using the PackedYUVToRGB Material node.
-	* @param Target The Unreal Engine / Tango Image interface object.
-	* @param Instance The Material Instance that should be updated.
-	* @param YTextureName The name of the Material Texture Parameter of the YTexture.
-	*	@param The name of the Material Texture Parameter of the UVTexture.
-	* @param The name of the Material Parameter for the Camera view width in Pixels.
-	* @return True when the Material was successfully prepared.
-	*/
-	UFUNCTION(Category = "Tango|Camera", BluePrintCallable, meta = (ToolTip = "Setup the AR Material for AR rendering.", keyword = "image, texture, material, camera, AR, alternate reality"))
-		bool PrepareTangoCameraColorMaterial(UMaterialInstanceDynamic* Instance, FName PackedYMaskTextureName = FName("PackedYMaskTexture"), FName PackedUVMaskTextureName = FName("PackedUVMaskTexture"), FName MaterialVectorName = FName("CameraMaterialVector"));
-
+		UTexture* GetCameraViewUVTexture(float& Timestamp, bool& bIsValid);
 	/*
 	*	Get Y component of camera texture view. Also returns a timestamp of when the image was captured and whether the result image is valid.
 	* @param Target The Unreal Engine / Tango Image interface object.
@@ -94,10 +61,5 @@ public:
 private:
 	UPROPERTY()
 		float LastBroadCastedTimestamp = 0;
-
-	UPROPERTY()
-		TArray<FInitMaterialListEntry> InitMaterialList;
-	UFUNCTION()
-		void UpdateTangoCameraMaterials();
 
 };

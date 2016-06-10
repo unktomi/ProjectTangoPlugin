@@ -30,6 +30,8 @@ limitations under the License.*/
 
 #include "TangoDevice.generated.h"
 
+class UTangoPointCloudComponent;
+
 UCLASS(NotBlueprintable, NotPlaceable, Transient)
 class UTangoDevice : public UObject, public FTickableGameObject
 {
@@ -40,7 +42,7 @@ private:
 	static UTangoDevice * Instance;
 	UTangoDevice();
 	void ProperInitialize();
-	void DeallocateResources();
+    void DeallocateResources();
 	~UTangoDevice();
 	virtual void BeginDestroy() override;
 
@@ -59,7 +61,7 @@ private:
 
 public:
 	static UTangoDevice& Get();
-
+    
 	//Getter functions for different submodules
 	TangoDevicePointCloud* getTangoDevicePointCloudPointer();
 	UTangoDeviceMotion* getTangoDeviceMotionPointer();
@@ -86,7 +88,7 @@ public:
 	ServiceStatus getTangoServiceStatus();
 	void RestartService(FTangoConfig& config, FTangoRuntimeConfig& runtimeConfig);
 	void StartTangoService(FTangoConfig& config, FTangoRuntimeConfig& runtimeConfig);
-	bool SetTangoRuntimeConfig(FTangoRuntimeConfig Configuration,bool PreRuntime = false);
+	bool SetTangoRuntimeConfig(FTangoRuntimeConfig Configuration,bool bPreRuntime = false);
 	void StopTangoService();
 	
 	FTangoConfig& GetCurrentConfig();
@@ -105,12 +107,19 @@ private:
 	//Core service functions
 	bool ApplyConfig();
 	void ConnectTangoService();
-	void DisconnectTangoService(bool byAppServicePause = false);
+	void DisconnectTangoService(bool bByAppServicePause = false);
+    //To be called during the final phase of DisconnectTangoService
+    void UnbindTangoService();
 	//Delegate binding functions
 	void AppServiceResume();
 	void AppServicePause();
-#endif
 
+public:
+    //Note: last part of the new async connection method
+    void BindAndCompleteConnectionToService(JNIEnv* env, jobject iBinder);
+
+#endif
+    
 	///////////////////////////
 	// General functionality //
 	///////////////////////////
@@ -123,10 +132,10 @@ public:
 	FString GetLoadedAreaDescriptionUUID();
 	TArray<FTangoAreaDescription> GetAreaDescriptions();
 	TArray<FString> GetAllUUIDs();
-	FTangoAreaDescriptionMetaData GetMetaData(FString UUID, bool& IsSuccessful);
-	void ImportCurrentArea(FString Filepath, bool& IsSuccessful);
-	void ExportCurrentArea(FString UUID, FString Filepath, bool& IsSuccessful);
-
+	FTangoAreaDescriptionMetaData GetMetaData(FString UUID, bool& bIsSuccessful);
+    void SaveMetaData(FString UUID, FTangoAreaDescriptionMetaData NewMetaData, bool& bIsSuccessful);
+	void ImportCurrentArea(FString Filepath, bool& bIsSuccessful);
+	void ExportCurrentArea(FString UUID, FString Filepath, bool& bIsSuccessful);
 	/////////////////
 	// Tango Event //
 	/////////////////
@@ -141,6 +150,8 @@ private:
 	void BroadCastEvents();
 #if PLATFORM_ANDROID
 	void OnTangoEvent(const TangoEvent * Event);
+    void PopulateAppContext();
+    void DePopulateAppContext();
 #endif
 	UPROPERTY(transient)
 	TArray<UTangoEventComponent*> TangoEventComponents;
@@ -149,6 +160,7 @@ private:
 	TArray<FTangoEvent> CurrentEventsCopy;
 #if PLATFORM_ANDROID
 	pthread_mutex_t Event_mutex;
+    jobject AppContextReference;
 #endif
 
 	/////////////////////
@@ -156,8 +168,6 @@ private:
 	/////////////////////
 public:
 	//@TODO: use friend classes instead of public
-	bool bFTangoViewExtensionRegistered = false;
-	TSharedRef< FTangoViewExtension, ESPMode::ThreadSafe > ViewExtension = TSharedRef< FTangoViewExtension, ESPMode::ThreadSafe >(new FTangoViewExtension());
 
 	//ATTENTION: These properties are used by other classes.
 	//They are here so persist even if the tango is being disconnected
@@ -172,6 +182,8 @@ public:
 	//TangoDeviceMotion
 	UPROPERTY(transient)
 		TArray<UTangoMotionComponent*> MotionComponents;
+	UPROPERTY(transient)
+		TArray<UTangoPointCloudComponent*> PointCloudComponents;
 	TArray<TArray<FTangoCoordinateFramePair>> RequestedPairs;
 	void AddTangoMotionComponent(UTangoMotionComponent* Component, TArray<FTangoCoordinateFramePair>& Requests);
 };

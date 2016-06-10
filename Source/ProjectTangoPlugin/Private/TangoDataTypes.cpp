@@ -17,6 +17,8 @@ limitations under the License.*/
 #include "tango_client_api.h"
 #endif
 
+//Tango Data Types function definition begins here
+
 //Assume a valid pairing- the frame pair should not default to the first elements of the enumeration
 FTangoCoordinateFramePair::FTangoCoordinateFramePair(const TEnumAsByte<ETangoCoordinateFrameType::Type> NewBaseFrame, 
 													 const TEnumAsByte<ETangoCoordinateFrameType::Type> NewTargetFrame)
@@ -25,10 +27,6 @@ FTangoCoordinateFramePair::FTangoCoordinateFramePair(const TEnumAsByte<ETangoCoo
 	TargetFrame = NewTargetFrame;
 }
 
-
-FTangoAreaDescription::FTangoAreaDescription()
-{
-}
 FTangoAreaDescription::FTangoAreaDescription(const FString InUUID, const FString InFileName)
 {
 	UUID = InUUID;
@@ -45,20 +43,6 @@ void FTangoAreaDescription::SetFilename(const FString NewValue)
 	Filename = NewValue;
 }
 
-FTangoRuntimeConfig::FTangoRuntimeConfig() {}
-
-FTangoConfig::FTangoConfig() {}
-
-FTangoPoseData::FTangoPoseData()
-{
-	Position = FVector(0, 0, 0);
-	Rotation = FRotator(0, 0, 0);
-	QuatRotation = FQuat(0, 0, 0, 1);
-	FrameOfReference = FTangoCoordinateFramePair();
-	StatusCode = ETangoPoseStatus::UNKNOWN;
-	Timestamp = 0.0;
-}
-
 FTangoPoseData::FTangoPoseData(FVector NewPosition, FRotator NewRotation, FQuat NewQuatRotation, FTangoCoordinateFramePair NewFrameOfReference,
 	TEnumAsByte<ETangoPoseStatus::Type> NewStatusCode, float NewTimestamp) {
 	Position = NewPosition;
@@ -68,16 +52,6 @@ FTangoPoseData::FTangoPoseData(FVector NewPosition, FRotator NewRotation, FQuat 
 	StatusCode = NewStatusCode;
 	Timestamp = NewTimestamp;
 }
-
-FTangoXYZijData::FTangoXYZijData() {}
-
-FTangoCameraIntrinsics::FTangoCameraIntrinsics() {}
-
-FTangoCameraIntrinsics::~FTangoCameraIntrinsics() {
-	Distortion.Empty();
-}
-
-FTangoAreaDescriptionMetaData::FTangoAreaDescriptionMetaData() {}
 
 FTangoAreaDescriptionMetaData::FTangoAreaDescriptionMetaData(const FString InFileName, const int32 InMillisecondsSinceUnixEpoch, const FTransform InTransformation)
 {
