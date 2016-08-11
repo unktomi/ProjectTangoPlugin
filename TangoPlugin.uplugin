@@ -1,0 +1,25 @@
+{
+	"PluginFileVersion" : 3,
+
+	"FriendlyName" : "Tango Plugin",
+	"Version" : 1,
+	"VersionName" : "1.0",
+    "EngineVersion" : "4.12.0",
+	"CreatedBy" : "Opaque Media Group",
+	"CreatedByURL" : "www.opaque.media",
+    "MarketplaceURL" : "com.epicgames.launcher://ue/marketplace/content/3870a1591e02409aa6b68b3aec338fbc",
+	"Description" : "Tango Plugin enables the use of Tango devices and sensors with Unreal 4",
+	"Category" : "Augmented Reality",
+	"EnabledByDefault" : false,
+	"IsBetaVersion": false,
+	"CanContainContent": true,
+	"Modules" :
+	[
+		{
+			"Name" : "TangoPlugin",
+			"Type" : "Runtime",
+			"WhitelistPlatforms" : [ "Win64", "android", "MAC" ],
+      "LoadingPhase" : "Default"
+		}
+	]
+}
