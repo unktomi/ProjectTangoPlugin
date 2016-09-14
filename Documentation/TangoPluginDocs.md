@@ -115,7 +115,7 @@ For more information read:
 
 ### Get Latest Image Timestamp
 
-![GetLatestImageTimestamp](./Images/GetLatestImageTimestamp.png)
+![GetLatestImageTimeStamp](./Images/GetLatestImageTimeStamp.png)
 
 #### Description:
 
