@@ -21,7 +21,7 @@ You can either attach components to the Tango Motion Component to have them move
 Returns true if the Tango is localized relative to the ADF file passed in as an argument in the Tango Config object when connecting to the Tango service.
 
 #### Inputs:
-- Target [Tango Motion Component Reference]: The Unreal Engine / Tango Area Learning interface object.
+- Target [[Tango Motion Component](#tango-motion-component) Reference]: The Unreal Engine / Tango Area Learning interface object.
 
 #### Outputs:
 - Return Value [Boolean]: Returns true if the Tango is currently localized relative to the loaded ADF.
@@ -37,7 +37,7 @@ Returns true if the Tango is localized relative to the ADF file passed in as an 
 Resets the motion tracking of the tango device. This function is equivalent to the TangoService_ResetMotionTracking function.
 
 #### Inputs:
-- Target [Tango Motion Component Reference]: The Unreal Engine / Tango Area Learning interface object.
+- Target [[Tango Motion Component](#tango-motion-component) Reference]: The Unreal Engine / Tango Area Learning interface object.
 
 ----------------
 
@@ -53,13 +53,13 @@ Target [Tango Motion Component Reference]: The Unreal Engine / Tango Motion Comp
 
 #### Outputs:
 - Timestamp [Float]: The seconds since tango service was started, when the latest pose was the latest pose was retrieved by this component.
-- Return Value [ETangoPoseStatus Enum]: Returns the status code of the latest pose retrieved by this motion component.
+- Return Value [[Tango Pose Status](#tango-pose-status) Enum]: Returns the status code of the latest pose retrieved by this motion component.
+
 ----------------
 
 ### Get Tango Pose At Time
 
 ![GetTangoPoseAtTime](./Images/GetTangoPoseAtTime.png)
-
 
 #### Description:
 Returns a Tango pose object for the given time relative to a specific frame of reference.
@@ -70,7 +70,7 @@ Returns a Tango pose object for the given time relative to a specific frame of r
 - Timestamp [Float]: The timestamp for which the Tango pose data should be retrieved. A common use case is to take a timestamp returned from the event of another component (such as depth or image) to get the closest matching pose to that particular event.
 
 #### Outputs:
-- Tango Pose Data [Tango Pose Data Structure]: A version of the Tango pose object from the indicated timestamp.
+- Tango Pose Data [[Tango Pose Data](#tango-pose-data) Structure]: A version of the Tango pose object from the indicated timestamp.
 
 ----------------
 
@@ -83,8 +83,8 @@ This configures Tango Motion Components to trigger Pose events for each of the p
 If this function is called twice, it will overwrite the previous set of coordinate frame pairs- so ensure that every frame pair you wish to receive an event for is included in this argument.
 
 #### Inputs:
-- Target [Tango Motion Component Reference]: The Unreal Engine / Tango Area Learning interface object.
-- Frame Pairs [ Array of TangoCoordinateFramePair Structures]: Specifies all frames of reference which should trigger an appropriate OnTangoPoseAvailable event.
+- Target [[Tango Motion Component](#tango-motion-component) Reference]: The Unreal Engine / Tango Area Learning interface object.
+- Frame Pairs [ Array of [TangoCoordinateFramePair](#tango-coordinate-frame-pair) Structures]: Specifies all frames of reference which should trigger an appropriate OnTangoPoseAvailable event.
 
 ----------------
 
@@ -96,8 +96,8 @@ If this function is called twice, it will overwrite the previous set of coordina
 This event will fire every frame when a new Tango Pose has occurred, for those coordinate frame pairs which have been registered using the
 
 #### Outputs:
-- Tango Pose Data [TangoPoseData Structure]: A version of the Tango pose object generated when this event is triggered.
-- Tango Coordinate Frame Pair [TangoCoordinateFramePair structure]: The base and target coordinate frames associated with this pose.
+- Tango Pose Data [[TangoPoseData](#tango-pose-data) Structure]: A version of the Tango pose object generated when this event is triggered.
+- Tango Coordinate Frame Pair [[TangoCoordinateFramePair](#tango-coordinate-frame-pair) structure]: The base and target coordinate frames associated with this pose.
 
 -----------------------
 
@@ -115,14 +115,14 @@ For more information read:
 
 ### Get Latest Image Timestamp
 
-![GetLatestImageTimeStamp](./Images/GetLatestImageTimeStamp.png)
+![GetLatestImageTimestamp](./Images/GetLatestImageTimestamp.png)
 
 #### Description:
 
 Returns a float which represents the time (in seconds since the Tango service was started) when the latest Image pose was retrieved.
 
 #### Inputs:
-- Target [Tango Image Component Reference]: The Unreal Engine / Tango Image interface object.
+- Target [[Tango Image Component](#tango-image-component) Reference]: The Unreal Engine / Tango Image interface object.
 
 #### Outputs:
 Return Value [Float]: The time (in seconds since the Tango service was started) when the latest Image pose was retrieved.
@@ -137,7 +137,7 @@ Return Value [Float]: The time (in seconds since the Tango service was started) 
 This event will fire every frame when a new Tango Pose has occurred.
 
 #### Outputs:
-- Tango Pose Data [Tango Pose Data Structure]: A version of the Tango pose object generated when this event is triggered.
+Return Value [Float]: The time (in seconds since the Tango service was started) when the latest Image pose was retrieved.
 
 -----------------------
 
@@ -176,7 +176,7 @@ Additionally, this component provides blueprint helper functions which assist in
 Passes a container object for the point cloud data around. Useful to provide other C++ scripts access to the point cloud without any additional copies. The reason this is useful is that all variable types except for UObjects which are expose to Blueprint by value- to avoid additional deep copies of the entire point cloud, this instead passes an object which contains a pointer which can be accessed in C++ code.
 
 #### Inputs:
-- Target [Tango Point Cloud Component Reference]: The Unreal Engine / Tango Point Cloud interface object.
+- Target [[Tango Point Cloud Component](#tango-point-cloud-component)  Reference]: The Unreal Engine / Tango Point Cloud interface object.
 
 #### Outputs:
 - Return Value [Point Cloud Container]: Container class for the point cloud.
@@ -191,7 +191,7 @@ Passes a container object for the point cloud data around. Useful to provide oth
 Retrieves the number of points contained within the latest frame from the point cloud.
 
 #### Inputs:
-- Target [Tango Point Cloud Component Reference]: The Unreal Engine / Tango Point Cloud interface object.
+- Target [[Tango Point Cloud Component](#tango-point-cloud-component) Reference]: The Unreal Engine / Tango Point Cloud interface object.
 
 #### Outputs:
 
@@ -208,7 +208,7 @@ Retrieves the number of points contained within the latest frame from the point 
 - Retrieve a single point from the point cloud.
 
 #### Inputs:
-- Target [TangoPointCloudComponent Reference]: The Unreal Engine / Tango Point Cloud interface object.
+- Target [[Tango Point Cloud Component](#tango-point-cloud-component) Reference]: The Unreal Engine / Tango Point Cloud interface object.
 - Index [Int]: The index of the point.
 
 #### Outputs:
@@ -227,7 +227,7 @@ Retrieves the number of points contained within the latest frame from the point 
 Retrieve the plane average of the points within range of the input screen point.
 
 #### Inputs:
-- Target [Tango Point Cloud Component Reference]: The Unreal Engine / Tango Point Cloud interface object.
+- Target [[Tango Point Cloud Component](#tango-point-cloud-component) Reference]: The Unreal Engine / Tango Point Cloud interface object.
 - Screen Point [Vector 2D Structure]: Position on the screen in Pixels.
 - Point Area Radius [Float]: Radius around screen point in Pixels.
 - Min Percentage [Float]: Set a minimum percentage float
@@ -250,7 +250,7 @@ Retrieve the plane average of the points within range of the input screen point.
 Get the max number of points a single frame from the point cloud can contain.
 
 #### Inputs:
-- Target [Tango Point Cloud Component Reference]: The Unreal Engine / Tango Point Cloud interface object.
+- Target [[Tango Point Cloud Component](#tango-point-cloud-component) Reference]: The Unreal Engine / Tango Point Cloud interface object.
 
 #### Outputs:
 - Return Value [Integer]: The maximum number of points the point cloud can contain.
@@ -265,8 +265,8 @@ Get the max number of points a single frame from the point cloud can contain.
 Get all points from the latest frame of the point cloud within the specified range of the input screen point.
 
 #### Inputs:
-- Target [Tango Point Cloud Component Reference]: The Unreal Engine / Tango Point Cloud interface object.
-- Screen Point [Vector 2D Structure]: Point on the screen in Pixels.
+- Target [[Tango Point Cloud Component](#tango-point-cloud-component) Reference]: The Unreal Engine / Tango Point Cloud interface object.
+- Screen Point [Vector 2D]: Point on the screen in Pixels.
 - Range [Float]: Range in Pixels around the screen point to return points from.
 
 #### Outputs:
@@ -283,7 +283,7 @@ Get all points from the latest frame of the point cloud within the specified ran
 Retrieves the closest point to a specified position on the screen from within the point cloud buffer.
 
 #### Inputs:
-- Target [Tango Point Cloud Component Reference]: The Unreal Engine / Tango Point Cloud interface object.
+- Target [[Tango Point Cloud Component](#tango-point-cloud-component) Reference]: The Unreal Engine / Tango Point Cloud interface object.
 - Screen Point [Vector 2D Structure]: Screen position in Pixels where the from the nearest depth point should be searched.
 - Max Distance from Point [Float]: Cutoff distance in Unreal units, points with a higher depth value are being ignored.input
 
@@ -302,7 +302,7 @@ This event will fire on every tick when there a new Depth update has occurred.
 It provides information about the number of points available in the latest depth frame, but not access to the raw buffer or helper functionality- these can be accessed by functions on the Point Cloud component instead.
 
 #### Outputs:
-- Tango XYZij Data [TangoXYZij Data Structure]: The Tango XYZij struct contains information returned from the depth sensor about how many points were returned during the latest Depth update, and the timestamp from the last Depth update. Please note that retrieval of individual points should occur from the "Get Single Point" function.
+- Tango XYZij Data [[TangoXYZij](#ftangoxyzijdata) Data Structure]: The Tango XYZij struct contains information returned from the depth sensor about how many points were returned during the latest Depth update, and the timestamp from the last Depth update. Please note that retrieval of individual points should occur from the "Get Single Point" function.
 
 -----------------------
 
@@ -340,8 +340,8 @@ This function is allows users to set the metadata contained within a specified A
 This metadata includes the position where the ADF was created (in Earth Centered, Earth Fixed co-ordinates), and the Filename of the ADF. Please note that it is not possible to set the timestamp of the ADF- this is created automatically when the ADF is first recorded, and attempts to re-set this information will fail.
 
 #### Inputs:
-- Target [Tango Area Learning Component Reference]: The Unreal Engine / Tango Area Learning interface object.
-- Area Description [FTangoAreaDescription]: The ADF to modify the metadata of.
+- Target [[Tango Area Learning Component](#tango-area-learning-component) Reference]: The Unreal Engine / Tango Area Learning interface object.
+- Area Description [[FTangoAreaDescription](#tango-area-description)]: The ADF to modify the metadata of. @todo check data type
 - New Metadata [FTangoAreaDescription Structure]: The struct containing the metatata to apply to the specified ADF.
 
 #### Outputs:
@@ -360,12 +360,12 @@ This function is used to expose the metadata contained within a specified ADF.
 This metadata includes the position and time that the ADF was created, and the Filename of the ADF.
 
 #### Inputs:
-- Target [Tango Area Learning Component Reference]: The Unreal Engine / Tango Area Learning interface object.
-- Area Description [FTangoAreaDescription]: The ADF which to inspect.
+- Target [[Tango Area Learning Component](#tango-area-learning-component) Reference]: The Unreal Engine / Tango Area Learning interface object.
+- Area Description [[FTangoAreaDescription](#tango-area-description)]: The ADF which to inspect.
 
 #### Outputs:
 - Is Successful [Boolean]: Returns true if the metadata get operation was successful.
- - Return Value [FTangoAreaDescription Meta Data Structure]: The metadata associated with this ADF, including the Filename, Time created (in milliseconds since the Unix Epoch), and the Earth Centered, Earth Fixed translation where the ADF was created.
+ - Return Value [[FTangoAreaDescription](#tango-area-description) Meta Data Structure]: The metadata associated with this ADF, including the Filename, Time created (in milliseconds since the Unix Epoch), and the Earth Centered, Earth Fixed translation where the ADF was created.
 
 ----------------
 
@@ -378,7 +378,7 @@ Imports the given Area Description File stored at the location denoted by the "F
 Note that this ADF becomes available to use with the current device but will still need to be loaded from the Tango core by restarting the Tango Service with the ADF within the Tango Core provided as an argument when starting up.
 
 #### Inputs:
-- Target [Tango Area Learning Component Reference]: The Unreal Engine / Tango Area Learning interface object.
+- Target [[Tango Area Learning Component](#tango-area-learning-component) Reference]: The Unreal Engine / Tango Area Learning interface object.
 - Filepath [String]: The file path of the ADF to import.
 
 #### Outputs:
@@ -394,7 +394,7 @@ Note that this ADF becomes available to use with the current device but will sti
 This function takes an existing, saved ADF within the device's Tango Core ADF repository, and saves the ADF to the file system in the location denoted by the 'Filepath' parameter, e.g. "/sdcard/".
 
 #### Inputs:
-- Target [TangoAreaLearningComponent Reference]: The Unreal Engine / Tango Area Learning interface object.
+- Target [[TangoAreaLearningComponent](#tango-area-learning-component) Reference]: The Unreal Engine / Tango Area Learning interface object.
 - UUID [String]: The UUID of the ADF you wish to export.
 - FilePath [String]: The file location to save your ADF on the file system.
 
@@ -411,13 +411,13 @@ This function takes an existing, saved ADF within the device's Tango Core ADF re
 Save the current area description file to the device. For this to work, you must have at least one Area Learning and Motion component in the scene, and have switched 'Area Learning' mode on in your configuration file.
 
 #### Inputs:
-- Target [Tango Area Learning Component Reference]: The Unreal Engine / Tango Area Learning interface object.
+- Target [[Tango Area Learning Component](#tango-area-learning-component) Reference]: The Unreal Engine / Tango Area Learning interface object.
 - FileName [String]: The file name to save your ADF with.
 
 
 #### Outputs:
 - Is Successful [Boolean]: Returns true if the save area description function was successful.
-- Return Value [FTangoAreaDescription]: The UUID/Filename associated with the newly created ADF.
+- Return Value [[FTangoAreaDescription](#tango-area-description)]: The UUID/Filename associated with the newly created ADF.
 
 ----------------
 
@@ -429,7 +429,7 @@ Save the current area description file to the device. For this to work, you must
 Returns true if Learning Mode is currently enabled.
 
 #### Inputs:
-- Target [Tango Area Learning Component Reference]: The Unreal Engine / Tango Area Learning interface object.
+- Target [[Tango Area Learning Component](#tango-area-learning-component) Reference]: The Unreal Engine / Tango Area Learning interface object.
 - Input Name [Input type]: Short description of input
 
 #### Outputs:
@@ -445,7 +445,7 @@ Returns true if Learning Mode is currently enabled.
 Delete the area description matching the UUID.
 
 #### Inputs:
-- Target [Tango Area Learning Component Reference]: The Unreal Engine / Tango Area Learning interface object.
+- Target [[Tango Area Learning Component](#tango-area-learning-component) Reference]: The Unreal Engine / Tango Area Learning interface object.
 - UUID [String]: The Unreal Unique Identifier of the area description to be deleted.
 
 #### Outputs:
@@ -461,10 +461,10 @@ Delete the area description matching the UUID.
 Get the current list of all the ADF UUIDs available in this device's Tango Core. Note that if there are any ADFs which are on the device's storage but not currently in the device's Tango Core repository, then developers should first call the "Import Current Area" function, supplying the filepath of the ADF they wish to import.
 
 #### Inputs:
-- Target [TangoAreaLearningComponent Reference]: The Unreal Engine / Tango Area Learning interface object.
+- Target [[TangoAreaLearningComponent](#tango-area-learning-component) Reference]: The Unreal Engine / Tango Area Learning interface object.
 
 #### Outputs:
-Return Value [Array of FTangoAreaDescription Structures]: An array of all tango area description structures available.
+Return Value [Array of [FTangoAreaDescription](#tango-area-description) Structures]: An array of all tango area description structures available.
 
 
 -----------------------
@@ -504,7 +504,7 @@ This event fires when the Tango service encounters an exception.
 Check the TangoEvent data structure for more information about the service exception.
 
 #### Outputs:
-- Event [TangoEvent structure]: Data relating to the event
+- Event [[TangoEvent](#tango-event) structure]: Data relating to the event
 
 ----------------
 
@@ -518,7 +518,7 @@ Address this event by moving the Tango device to a less brightly lit area.
 
 
 #### Outputs:
-- Event [TangoEvent structure]: Data relating to the event
+- Event [[TangoEvent](#tango-event) structure]: Data relating to the event
 
 ----------------
 
@@ -531,7 +531,7 @@ This event fires when the Fisheye camera is under-exposed, which will interfere 
 Address this event by moving the Tango device to a more brightly lit area.
 
 #### Outputs:
-- Event [TangoEvent structure]: Data relating to the event
+- Event [[TangoEvent](#tango-event) structure]: Data relating to the event
 
 ----------------
 
@@ -544,7 +544,7 @@ This event fires when the Tango Color Camera is over exposed.
 Address this event by moving the Tango device to a less brightly lit area.
 
 #### Outputs:
-- Event [TangoEvent structure]: Data relating to the event.
+- Event [[TangoEvent](#tango-event) structure]: Data relating to the event.
 
 ----------------
 
@@ -557,7 +557,7 @@ This event fires when the Tango color camera is under exposed.
 This will fire in dimly lit environments- move the Tango to a more brightly lit area to address this exception.
 
 #### Outputs:
-- Event [TangoEvent structure]: Data relating to the event.
+- Event [[TangoEvent](#tango-event) structure]: Data relating to the event.
 
 ----------------
 
@@ -570,7 +570,7 @@ This event fires when the Tango service cannot find enough features using the fi
 Feature-sparse environments, such as blank white walls, will trigger this more often than brigthtly lit, complex environments such as walls with posters placed upon them.
 
 #### Outputs:
-- Event [TangoEvent structure]: Data relating to the event.
+- Event [[TangoEvent](#tango-event) structure]: Data relating to the event.
 
 ----------------
 
@@ -582,7 +582,7 @@ Feature-sparse environments, such as blank white walls, will trigger this more o
 This event fires while an ADF save is taking place, and the TangoEvent message will display the percentage completion of the save.
 
 #### Outputs:
-- Event [TangoEvent structure]: Data relating to the event.
+- Event [[TangoEvent](#tango-event) structure]: Data relating to the event.
 
 ----------------
 
@@ -594,7 +594,7 @@ This event fires while an ADF save is taking place, and the TangoEvent message w
 This event fires when the Tango service encounters an error with an unknown error code or type.
 
 #### Outputs:
-- Event [TangoEvent structure]: Data relating to the event.
+- Event [[TangoEvent](#tango-event) structure]: Data relating to the event.
 
 ----------------
 
@@ -606,7 +606,7 @@ This event fires when the Tango service encounters an error with an unknown erro
 This event fires when an ADF file import has been attempted, and provides an enumeration which describes whether the export attempt has succeeded or failed.
 
 #### Outputs:
-- Event [TangoEvent structure]: Data relating to the event.
+- Event [[TangoEvent](#tango-event) structure]: Data relating to the event.
 
 ----------------
 
@@ -618,7 +618,7 @@ This event fires when an ADF file import has been attempted, and provides an enu
 This event fires when an ADF file export has been attempted, and provides an enumeration which describes whether the export attempt has succeeded or failed.
 
 #### Outputs:
-- Event [TangoEvent structure]: Data relating to the event
+- Event [[TangoEvent](#tango-event) structure]: Data relating to the event
 
 -----------------------
 
@@ -637,7 +637,7 @@ They are used to retrieve information which does not relate to any particular co
 Sets the runtime-settable parameters of the Tango to the values of the FTangoRuntimeConfig struct passed into the Configuration argument.
 
 #### Inputs:
-- Configuration [FTangoRuntimeConfig]: The runtime-settable configuration parameters to pass the Tango service.
+- Configuration [[FTangoRuntimeConfig](#ftangoruntimeconfig)]: The runtime-settable configuration parameters to pass the Tango service.
 
 #### Outputs:
 - Return Value: returns true if the runtime configuration values were successfully set.
@@ -652,7 +652,7 @@ Sets the runtime-settable parameters of the Tango to the values of the FTangoRun
 Disconnects the currently connected Tango service and reconnects the Tango service with the given configuration parameters.
 
 #### Inputs:
-- Configuration [FTangoConfig]: The configuration parameters to pass the Tango service.
+- Configuration [[FTangoConfig](#ftangoconfig)]: The configuration parameters to pass the Tango service.
 
 ----------------
 
@@ -676,8 +676,8 @@ Returns true if the Tango Service is currently connected and running, otherwise 
 Returns structures representing the current Tango Config and Tango Runtime Config.
 
 #### Outputs:
-- Runtime Config [FTangoRuntimeConfig]: A struct containing the current runtime-settable configuration options.
-- Return Value [FTangoConfig]: A struct containing the current non-runtime-settable configuration options.
+- Runtime Config [[FTangoRuntimeConfig](#ftangoruntimeconfig)]: A struct containing the current runtime-settable configuration options.
+- Return Value [[FTangoConfig](#ftangoconfig)]: A struct containing the current non-runtime-settable configuration options.
 
 ----------------
 
@@ -689,7 +689,7 @@ Returns structures representing the current Tango Config and Tango Runtime Confi
 Returns the currently loaded Area Definition file.
 
 #### Outputs:
-- Return Value [FTangoAreaDescription]: the ADF that is currently loaded. If no ADF is currently loaded, this will return a struct with blank values for UUID and Filename.
+- Return Value [[FTangoAreaDescription](#tango-area-description)]: the ADF that is currently loaded. If no ADF is currently loaded, this will return a struct with blank values for UUID and Filename.
 
 ----------------
 
@@ -701,7 +701,7 @@ Returns the currently loaded Area Definition file.
 Returns the last used Area Definition file.
 
 #### Outputs:
-- Return Value [FTangoAreaDescription]: the latest ADF that was used by this device.
+- Return Value [[FTangoAreaDescription](#tango-area-description)]: the latest ADF that was used by this device.
 
 ----------------
 
@@ -713,10 +713,10 @@ Returns the last used Area Definition file.
 Returns a structure containing information about the nature of the selected camera. This is useful for many Augmented Reality and camera alignment calculations.
 
 #### Inputs:
-- Camera ID [ETangoCameraType]: an enumeration which denotes which camera's intrinsics information should be returned in the output FTangoCameraIntrinsics struct.
+- Camera ID [[FTangoCameraType](#tango-camera-type)]: an enumeration which denotes which camera's intrinsics information should be returned in the output TangoCameraIntrinsics struct.
 
 #### Outputs:
-- Return Value [FTangoCameraIntrinsics]: an array of all the UUID/Filename pairs stored within this device's Tango Core repository.
+- Return Value [[FTangoCameraIntrinsics](#tango-camera-intrinsics)]: an array of all the UUID/Filename pairs stored within this device's Tango Core repository.
 
 ----------------
 
@@ -728,7 +728,7 @@ Returns a structure containing information about the nature of the selected came
 Returns an array containing all of the Area Description files which are stored within this devices's Tango Core Repository. Please note that this does not include ADFs stored in other areas on the file system of the device.
 
 #### Outputs:
-- Return Value [FTangoAreaDescription]: an array of all the UUID/Filename pairs stored within this device's Tango Core repository.
+- Return Value [[FTangoAreaDescription](#tango-area-description)]: an array of all the UUID/Filename pairs stored within this device's Tango Core repository.
 
 
 ----------------
@@ -753,8 +753,8 @@ Connects the Tango service with the given configuration parameters.
 All Tango components require the Tango service to be connected in order to function correctly, and developers must manually connect using this function.
 
 #### Inputs:
-- Configuration [FTangoConfig]: The configuration parameters to pass the Tango service.
-- Runtime Configuration [FTangoRuntimeConfig]: The runtime configuration parameters for the Tango service, including whether the Camera and Depth camera should be enabled and the desired frame rate of the depth camera.
+- Configuration [[FTangoConfig](#ftangoconfig)]: The configuration parameters to pass the Tango service.
+- Runtime Configuration [[FTangoRuntimeConfig](#ftangoruntimeconfig)]: The runtime configuration parameters for the Tango service, including whether the Camera and Depth camera should be enabled and the desired frame rate of the depth camera.
 
 
 -----------------------
@@ -779,6 +779,20 @@ This enumeration represents the state of the current pose- a pose will contain d
 
 --------
 
+
+### Tango Camera Type
+
+#### Description:
+This enumeration represents each different type of camera which can be found on a Tango device.
+
+### Valid values:
+- [0] Color Camera
+- [1] Depth Camera
+- [2] Fisheye Camera
+- [3] RGBIR Camera
+
+--------
+
 ### Tango Event Key
 
 #### Description:
@@ -787,8 +801,8 @@ This enumeration represents each type of event which can be fired from the Tango
 ### Valid values:
 - [0] Area Description Save Progress
 - [1] Service Exception
-- [2] Colour Over Exposed
-- [3] Colour Under Exposed
+- [2] Color Over Exposed
+- [3] Color Under Exposed
 - [4] Fisheye Over Exposed
 - [5] Fisheye Under Exposed
 - [6] Too Few Features Tracked
@@ -826,6 +840,21 @@ This enumeration signals whether a request to the Tango service (e.g. an ADF Imp
 
 --------
 
+### Tango Calibration Type
+
+#### Description:
+This Enum directly corresponds to the TangoCalibrationType enum of the Tango C API.
+Please see [https://developers.google.com/tango/apis/c/reference/group/enums](https://developers.google.com/tango/apis/c/reference/group/enums) for more information.
+
+### Valid values:
+- [0] Equidistant
+- [1] Polynomial: 2 parameters
+- [2] Polynomial: 3 parameters
+- [3] Polynomial: 5 parameters
+- [4] Unknown
+
+--------
+
 ### Tango Coordinate Frame Type
 
 #### Description:
@@ -839,7 +868,7 @@ This is a list of all the different supported Coordinate Frame types.
 - [4] Device
 - [5] IMU
 - [6] Display
-- [7] Camera: Colour
+- [7] Camera: Color
 - [8] Camera: Depth
 - [9] Camera: Fisheye
 
@@ -848,6 +877,56 @@ This is a list of all the different supported Coordinate Frame types.
 ## Tango Data Types
 
 The following custom data structures are used in the Tango plugin.
+
+--------
+
+### FTangoConfig
+
+#### Description:
+This data structure is used to set the configuration of the Tango service. The data structure is set up and then passed as an argument to functions such as Start Tango Service and Restart Tango Service.
+
+#### Fields:
+- Enable Auto Recovery [bool]: If set to true, the Tango motion tracking will attempt to re-locate itself in the event that the service becomes confused or momentarily lost.
+- Enable Color Camera Capabilities [bool]: If set to true, the color camera may be used by the application. Remember to also set the color camera to update using the Tango Runtime Config.
+- Color Mode Auto [bool]: If set to true, the Color ISO and Color Exposure fields will be ignored and the camera will auto-adjust to attempt to capture the best possible image.
+-  Enable Depth Capabilities [bool]: If set to true, the application may use depth functionality when the Runtime Config 'Enable Depth' flag is also set to true.
+- High Rate Pose [bool]: If set to true, the Tango motion service will perform at a far higher frame rate than otherwise. Recommended for any application which needs to position objects, including the camera, in real time. Required for passthrough A.R. applications.
+- Low Latency IMUIntegration [bool]: If set to true, the Tango service will take advantage of any available hardware motion tracking capabilities the current device may have available. Recommended for passthrough A.R. applications.
+- Enable Motion Tracking [bool]: Enables the application to use data related to the motion service. If disabled, the application will not be able to use the Tango Motion or Area Learning component functionality. Required for A.R. applications.
+- Smooth Pose [bool]: If set to true, the Tango service will interpolate between the available motion data frames to estimate the device's position at the requested position, rather than return the latest known pose. This results in smoother 'Magic Window' applications, but MUST be turned off for A.R. applications or the image and motion data will become desynchronised and a visible 'sloshing' artifact will occur.
+- Color Exposure [int]: The desired camera exposure time, in milliseconds. Will be ignored if 'Color Mode Auto' flag is set to true.
+- Color ISO [int]: The desired ISO of the color camera. Will be ignored if 'Color Mode Auto' flag is set to true.
+- Area Description [[Tango Area Description](#tango-area-description)]: A struct which references  the ADF you'd like to load into the Tango Service for use with the Tango Motion and Area Learning components.
+
+--------
+
+### FTangoRuntimeConfig
+
+#### Description:
+This data structure is used to set the configuration of the Tango service. The data structure is set up and then passed as an argument to functions such as Start Tango Service and Restart Tango Service.
+
+#### Fields:
+- Enable Depth [bool]: If checked, and the requisite Enable Depth Capabilities field of the supplied TangoConfig is also checked, then the Tango device will continuously scan for Depth data at the specified Framerate.
+- Enable Color Camera [bool]: If checked, and the requisite Enable Color Camera Capabilities field of the supplied TangoConfig is also checked, then the Color camera will continuously update, populating any relevant in-game textures with the latest available camera image.
+- Runtime Depth Framerate [int]: The desired hertz of the depth camera. Depth frames will refresh this many times each second, assuming the number is valid for your device. For example, currently values between 0-5 are accepted by the Tango Yellowstone tablet.
+
+--------
+
+### Tango Camera Intrinsics
+
+#### Description:
+This data structure contains the mappings for the camera intrinsics, which area camera parameters used in mapping sensor data to Unreal Engine world co-ordinates. See [https://developers.google.com/tango/overview/intrinsics-extrinsics](https://developers.google.com/tango/overview/intrinsics-extrinsics) for more details on how camera Intrinsics and Extrinsics can be used to power AR experiences.
+
+#### Fields:
+- Calibration Type [[FTangoCalibrationType](#tango-calibration-type)]: The type of calibration which has been currently achieved by the given camera.
+- Camera ID [[FTangoCameraType](#tango-camera-type)]: Designates which camera's intrinsics are represented by this struct.
+- Cx [int]: The Cx value of this camera.
+- Cy [int]: The Cy value of this camera.
+- Distortion [float array]: An array of length 5 which contains the distortion parameters of this camera.
+- Fx [int]: The Fx value of this camera.
+- Fy [int]: The Fy value of this camera.
+- Width [int]: The width of the image output resolution of this camera.
+- Height [int]: The height of the image output resolution of this camera.
 
 --------
 
@@ -872,8 +951,8 @@ This struct is used to specify the desired base and target frames of reference w
 For more information, including which coordinate frame pairs are valid, read [here](https://developers.google.com/tango/overview/frames-of-reference).
 
 #### Fields:
-- Base Frame [ETangoCoordinateFrameType Enum]: The co-ordinate from which to obtain the 'starting position' of a given pose, e.g. the point in space where the tango was present when the service started up.
-- Target Frame [ETango Coordinate Frame Type Enum]: The co-ordinate from which to obtain the 'current position' of a given pose, e.g. the current position of the Device.
+- Base Frame [[TangoCoordinateFrameType](#tango-coordinate-frame-type) Enum]: The co-ordinate from which to obtain the 'starting position' of a given pose, e.g. the point in space where the tango was present when the service started up.
+- Target Frame [[TangoCoordinateFrameType](#tango-coordinate-frame-type) Enum]: The co-ordinate from which to obtain the 'current position' of a given pose, e.g. the current position of the Device.
 
 --------
 
@@ -884,8 +963,8 @@ This struct contains metadata relating to various types of Tango events, and is 
 Each event can pass additional information through the Message string, and the format and type of information presented will depend on which event has fired.
 
 #### Fields:
-- Key [ETangoEventType]: Represents the name of the particular event which has been fired.
-- Type [ETangoEventType]: Represents the class of event which has been fired.
+- Key [[TangoEventType](#tango-event-type)]: Represents the name of the particular event which has been fired.
+- Type [[TangoEventType](#tango-event-type)]: Represents the class of event which has been fired.
 - Message [String]: Message detail from the event. Possible output values will depend on the type of the event.
 - TimeStamp [float]: The time in seconds since the Tango Service started.
 
@@ -899,8 +978,8 @@ The TangoPoseData struct contains pose information returned from motion tracking
 #### Fields
 Position [Vector]: The position of the tango device.
 Rotation [Rotator]: The rotation of the tango device.
-Frame of Reference [Tango Coordinate Frame Pair Structure]: The Frame of Reference for this TangoPoseStructure; for example Base: Start of Service, Target: Device.
-Status Code [ETango Pose Status Enum]: The current status of the pose- can be Valid, Initializing, or Invalid.
+Frame of Reference [[Tango Coordinate Frame Pair](#tango-coordinate-frame-pair) Structure]: The Frame of Reference for this TangoPoseStructure; for example Base: Start of Service, Target: Device.
+Status Code [[Tango Pose Status](#tango-pose-status) Enum]: The current status of the pose- can be Valid, Initializing, or Invalid.
 Timestamp [Float]: The number of seconds since the tango service was started, when this structure was generated.
 
 --------
@@ -911,5 +990,5 @@ Timestamp [Float]: The number of seconds since the tango service was started, wh
 This is the Filename/UUID pair representing an ADF which is currently within the Tango Core of the user's device. It can be used as an input for the Connect node, in which case the system will attempt to localize against it.
 
 #### Fields
-UUID [String]: universally unique identifier string set
-Filename [String]: Name of the file
+UUID [String]: A universally unique identifier for the ADF, represented as a string.
+Filename [String]: The name of the file.
