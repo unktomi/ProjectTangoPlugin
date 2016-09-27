@@ -109,7 +109,7 @@ Note that the Tango natively returns textures in the YUV format, and so conversi
 
 For more information read:
 
-[https://developers.google.com/project-tango/apis/c/reference/struct/tango-image-buffer](https://developers.google.com/project-tango/apis/c/reference/struct/tango-image-buffer)
+[https://developers.google.com/tango/apis/c/reference/struct/tango-image-buffer](https://developers.google.com/tango/apis/c/reference/struct/tango-image-buffer)
 
 -----------------------
 
@@ -324,9 +324,9 @@ The Area Learning Component provides access to blueprint nodes that expose this 
 
 For more information on Area Learning, see:
 
-[https://developers.google.com/project-tango/apis/c/c-area-learning](https://developers.google.com/project-tango/apis/c/c-area-learning)
+[https://developers.google.com/tango/overview/area-learning](https://developers.google.com/tango/overview/area-learning)
 
-[https://developers.google.com/project-tango/apis/c/reference/group/area-description](https://developers.google.com/project-tango/apis/c/reference/group/area-description)
+[https://developers.google.com/tango/apis/c/reference/group/area-description](https://developers.google.com/tango/apis/c/reference/group/area-description)
 
 
 ----------------
