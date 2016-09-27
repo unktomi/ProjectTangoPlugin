@@ -976,11 +976,11 @@ Each event can pass additional information through the Message string, and the f
 The TangoPoseData struct contains pose information returned from motion tracking.
 
 #### Fields
-Position [Vector]: The position of the tango device.
-Rotation [Rotator]: The rotation of the tango device.
-Frame of Reference [[Tango Coordinate Frame Pair](#tango-coordinate-frame-pair) Structure]: The Frame of Reference for this TangoPoseStructure; for example Base: Start of Service, Target: Device.
-Status Code [[Tango Pose Status](#tango-pose-status) Enum]: The current status of the pose- can be Valid, Initializing, or Invalid.
-Timestamp [Float]: The number of seconds since the tango service was started, when this structure was generated.
+- Position [Vector]: The position of the tango device.
+- Rotation [Rotator]: The rotation of the tango device.
+- Frame of Reference [[Tango Coordinate Frame Pair](#tango-coordinate-frame-pair) Structure]: The Frame of Reference for this TangoPoseStructure; for example Base: Start of Service, Target: Device.
+- Status Code [[Tango Pose Status](#tango-pose-status) Enum]: The current status of the pose- can be Valid, Initializing, or Invalid.
+- Timestamp [Float]: The number of seconds since the tango service was started, when this structure was generated.
 
 --------
 
@@ -990,5 +990,5 @@ Timestamp [Float]: The number of seconds since the tango service was started, wh
 This is the Filename/UUID pair representing an ADF which is currently within the Tango Core of the user's device. It can be used as an input for the Connect node, in which case the system will attempt to localize against it.
 
 #### Fields
-UUID [String]: A universally unique identifier for the ADF, represented as a string.
-Filename [String]: The name of the file.
+- UUID [String]: A universally unique identifier for the ADF, represented as a string.
+- Filename [String]: The name of the file.
