@@ -42,7 +42,8 @@ namespace
 		}
 		return (ResultOfServiceCall == TANGO_SUCCESS && D.StatusCode == ETangoPoseStatus::VALID);
 #else
-		return false;
+		Matrix.SetIdentity();
+		return true;
 #endif
 	}
 

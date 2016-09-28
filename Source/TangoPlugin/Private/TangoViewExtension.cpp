@@ -98,7 +98,9 @@ bool FTangoViewExtension::IdentifyViewWithCameraComponent(const FSceneView* InVi
 			}
 		}
 	}
+#if !WITH_EDITOR
 	UE_LOG(TangoPlugin, Warning, TEXT("FTangoViewExtension::IdentifyViewWithCameraComponent: Did not identify Actor"));
+#endif
 	return false;
 }
 
@@ -159,7 +161,9 @@ const bool FTangoViewExtension::GetLateUpdateTransform(FTransform& Transform,int
 			return bIsNew;
 		}
 	}
+#if !WITH_EDITOR
 	UE_LOG(TangoPlugin, Warning, TEXT("FTangoViewExtension::GetLateUpdateTransform: Failed because pose is invalid!"));
+#endif
 	Transform = FTransform::Identity;
 	return false;
 }

@@ -95,7 +95,9 @@ void UTangoMotionComponent::TickComponent(float DeltaTime, enum ELevelTick TickT
 	}
 	else
 	{
+#if !WITH_EDITOR
 		UE_LOG(TangoPlugin, Warning, TEXT("UTangoMotionComponent::LateUpdate: Could not update transfrom because Tango Service is not connect or has motion tracking disabled!"));
+#endif
 	}
 
 	if (!ViewExtension.IsValid() && GEngine)

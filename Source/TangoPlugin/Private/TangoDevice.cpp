@@ -382,7 +382,7 @@ bool UTangoDevice::ApplyConfig()
 }
 
 /*
- * This funciton sends a request to the Java layer to start the Tango service
+ * This function sends a request to the Java layer to start the Tango service
  */
 void UTangoDevice::ConnectTangoService()
 {
@@ -411,7 +411,7 @@ void UTangoDevice::ConnectTangoService()
 }
 
 /*
- * This funciton sends a request to the Java layer to start the Tango service
+ * This function sends a request to the Java layer to start the Tango service
  */
 void UTangoDevice::UnbindTangoService()
 {

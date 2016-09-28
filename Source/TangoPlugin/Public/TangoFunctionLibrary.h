@@ -1,6 +1,6 @@
 /*Copyright 2016 Google
 Author: Opaque Media Group
- 
+
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
@@ -16,6 +16,8 @@ limitations under the License.*/
 
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "TangoDataTypes.h"
+#include "TangoCoordinateConversions.h"
+#include "TangoAreaLearningComponent.h"
 #include "TangoFunctionLibrary.generated.h"
 
 /**
@@ -96,4 +98,70 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Tango|Core", meta = (Keywords = "tango, camera, camera type, device"))
 		static FTangoCameraIntrinsics GetCameraIntrinsics(TEnumAsByte<ETangoCameraType::Type> CameraID);
 
+	/*
+	* Utility to get a rotation as a quaternion
+	*/
+	UFUNCTION(BlueprintCallable, Category = "Tango|Util", BlueprintPure)
+		static FQuat GetRotationAsQuaternion(const FRotator& Rotator)
+	{
+		return Rotator.Quaternion();
+	}
+
+	/*
+	* Utility to get a rotation as a Rotator
+	*/
+	UFUNCTION(BlueprintCallable, Category = "Tango|Util", BlueprintPure)
+		static FRotator GetRotationAsRotator(const FQuat& Quat)
+	{
+		return FRotator(Quat);
+	}
+
+	/*
+	* Utility to convert from UE Coordinates to a Tango Coordinate frame
+	*/
+	UFUNCTION(BlueprintCallable, Category = "Tango|Util", BlueprintPure)
+		static void ConvertTransformToTango(const FTransform& Transform, ETangoCoordinateFrameType::Type TargetFrame, FTransform& Result)
+	{
+		TangoSpaceConversions::TangoSpaceConversionPair Converter;
+		FTangoCoordinateFramePair RefPair;
+		RefPair.BaseFrame = TargetFrame;
+		RefPair.TargetFrame = TargetFrame;
+		TangoSpaceConversions::GetSpaceConversionPair(Converter, RefPair);
+		FMatrix Source = Transform.ToMatrixWithScale();
+		Result.SetFromMatrix(Converter.UEtoBaseFrame * Source);
+	}
+
+	/*
+	* Utility to convert to UE Coordinates from a Tango Coordinate frame
+	*/
+	UFUNCTION(BlueprintCallable, Category = "Tango|Util", BlueprintPure)
+		static void ConvertTransformFromTango(const FTransform& Transform, ETangoCoordinateFrameType::Type BaseFrame, FTransform& Result)
+	{
+		TangoSpaceConversions::TangoSpaceConversionPair Converter;
+		FTangoCoordinateFramePair RefPair;
+		RefPair.BaseFrame = BaseFrame;
+		RefPair.TargetFrame = BaseFrame;
+		TangoSpaceConversions::GetSpaceConversionPair(Converter, RefPair);
+		FMatrix Source = Transform.ToMatrixWithScale();
+		Result.SetFromMatrix(Converter.TargetFrameToUE * Source);
+	}
+
+	/*
+	* Utility to get ADF origin in ECEF coordinates
+	*/
+	UFUNCTION(BlueprintCallable, Category = "Tango|Util")
+		static bool GetADFOriginInECEF(UTangoAreaLearningComponent* AreaLearningComponent,
+			const FTangoAreaDescription& AreaDescription, FTransform& Result)
+	{
+		bool Success;
+		FTangoAreaDescriptionMetaData Meta = AreaLearningComponent->GetMetaData(AreaDescription, Success);
+		if (Success)
+		{
+			const FVector Position(Meta.TransformationX, Meta.TransformationY, Meta.TransformationZ);
+			const FQuat Rotation(Meta.TransformationQX, Meta.TransformationQY, Meta.TransformationQZ, Meta.TransformationQW);
+			const FRotator Orientation(Rotation);
+			Result = FTransform(Orientation, Position);
+		}
+		return Success;
+	}
 };
